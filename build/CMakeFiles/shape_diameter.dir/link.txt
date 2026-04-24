@@ -1,0 +1,1 @@
+/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/shape_diameter.dir/app/shape_diameter.cpp.o -o shape_diameter  -Wl,-rpath,/opt/homebrew/lib /opt/homebrew/lib/libembree4.4.dylib

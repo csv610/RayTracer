@@ -1,0 +1,10 @@
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/meshvis.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/sphere_benchmark.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/shape_diameter.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/raytracer.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/shadow_plane.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/depth_map.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/test_mesh_utils.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/test.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/edit_cache.dir
+/Users/csv610/Projects/Mesh/RayTrace/build/CMakeFiles/rebuild_cache.dir
