@@ -74,6 +74,9 @@ target_link_libraries(draft_angle_analysis PRIVATE embree TBB::tbb assimp::assim
 add_executable(mesh_voxelizer app/mesh_voxelizer.cpp src/MeshIO.cpp)
 target_link_libraries(mesh_voxelizer PRIVATE embree TBB::tbb assimp::assimp)
 
+add_executable(projected_thickness app/projected_thickness.cpp src/MeshIO.cpp)
+target_link_libraries(projected_thickness PRIVATE embree TBB::tbb assimp::assimp)
+
 add_executable(test_symmetry_sphere app/test_symmetry_sphere.cpp src/MeshIO.cpp src/SampleSurface.cpp src/SymmetryDetector.cpp)
 target_link_libraries(test_symmetry_sphere PRIVATE embree TBB::tbb assimp::assimp)
 
