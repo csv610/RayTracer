@@ -29,6 +29,9 @@ struct AABB {
 struct Mesh {
     std::vector<Vertex> vertices;
     std::vector<Triangle> triangles;
+    std::vector<Vec3> vertexColors;
+    std::vector<Vec3> faceColors;
+    std::vector<Vec3> vertexNormals;
 };
 
 inline Vec3 computeFaceNormal(const Vertex& v0, const Vertex& v1, const Vertex& v2) {
@@ -38,6 +41,20 @@ inline Vec3 computeFaceNormal(const Vertex& v0, const Vertex& v1, const Vertex& 
     float len = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
     if (len > 0) { n.x /= len; n.y /= len; n.z /= len; }
     return n;
+}
+
+inline void computeVertexNormals(Mesh& mesh) {
+    mesh.vertexNormals.assign(mesh.vertices.size(), {0, 0, 0});
+    for (const auto& t : mesh.triangles) {
+        Vec3 n = computeFaceNormal(mesh.vertices[t.v0], mesh.vertices[t.v1], mesh.vertices[t.v2]);
+        mesh.vertexNormals[t.v0].x += n.x; mesh.vertexNormals[t.v0].y += n.y; mesh.vertexNormals[t.v0].z += n.z;
+        mesh.vertexNormals[t.v1].x += n.x; mesh.vertexNormals[t.v1].y += n.y; mesh.vertexNormals[t.v1].z += n.z;
+        mesh.vertexNormals[t.v2].x += n.x; mesh.vertexNormals[t.v2].y += n.y; mesh.vertexNormals[t.v2].z += n.z;
+    }
+    for (auto& n : mesh.vertexNormals) {
+        float len = n.length();
+        if (len > 0) { n.x /= len; n.y /= len; n.z /= len; }
+    }
 }
 
 inline float computeFaceArea(const Vertex& v0, const Vertex& v1, const Vertex& v2) {

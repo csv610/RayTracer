@@ -14,6 +14,7 @@ public:
 private:
     static bool readOFF(const std::string& filename, Mesh& mesh);
     static bool readPLY(const std::string& filename, Mesh& mesh);
+    static bool writePLY(const std::string& filename, const Mesh& mesh);
     static bool loadWithAssimp(const std::string& filename, Mesh& mesh);
 };
 

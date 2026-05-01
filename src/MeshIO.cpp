@@ -97,15 +97,34 @@ bool MeshIO::readPLY(const std::string& filename, Mesh& mesh) {
     for (const auto& e : elements) {
         if (e.isVertex) {
             mesh.vertices.resize(e.count);
+            bool hasColor = false;
+            for (const auto& p : e.props) if (p.name == "red" || p.name == "diffuse_red") hasColor = true;
+            if (hasColor) mesh.vertexColors.resize(e.count);
+
             for (int i = 0; i < e.count; ++i) {
                 for (const auto& p : e.props) {
                     if (p.name == "x") file.read((char*)&mesh.vertices[i].x, 4);
                     else if (p.name == "y") file.read((char*)&mesh.vertices[i].y, 4);
                     else if (p.name == "z") file.read((char*)&mesh.vertices[i].z, 4);
+                    else if (p.name == "red" || p.name == "diffuse_red") {
+                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.vertexColors[i].x = c / 255.0f; }
+                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.vertexColors[i].x = c; }
+                    }
+                    else if (p.name == "green" || p.name == "diffuse_green") {
+                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.vertexColors[i].y = c / 255.0f; }
+                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.vertexColors[i].y = c; }
+                    }
+                    else if (p.name == "blue" || p.name == "diffuse_blue") {
+                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.vertexColors[i].z = c / 255.0f; }
+                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.vertexColors[i].z = c; }
+                    }
                     else file.seekg(p.size, std::ios::cur);
                 }
             }
         } else if (e.isFace) {
+            bool hasColor = false;
+            for (const auto& p : e.props) if (p.name == "red") hasColor = true;
+            
             for (int i = 0; i < e.count; ++i) {
                 unsigned char n; file.read((char*)&n, 1);
                 std::vector<unsigned int> indices(n);
@@ -113,7 +132,22 @@ bool MeshIO::readPLY(const std::string& filename, Mesh& mesh) {
                     unsigned int idx; file.read((char*)&idx, 4);
                     indices[j] = idx;
                 }
-                for (int j = 1; j < n - 1; ++j) mesh.triangles.push_back({indices[0], indices[j], indices[j+1]});
+                for (int j = 1; j < n - 1; ++j) {
+                    mesh.triangles.push_back({indices[0], indices[j], indices[j+1]});
+                    if (hasColor) mesh.faceColors.push_back({0,0,0}); // Placeholder or read if present
+                }
+                // Reading face colors if present (simplified)
+                if (hasColor) {
+                    Vec3 fc = {0,0,0};
+                    for (const auto& p : e.props) {
+                        if (p.name == "red") { unsigned char c; file.read((char*)&c, 1); fc.x = c/255.0f; }
+                        else if (p.name == "green") { unsigned char c; file.read((char*)&c, 1); fc.y = c/255.0f; }
+                        else if (p.name == "blue") { unsigned char c; file.read((char*)&c, 1); fc.z = c/255.0f; }
+                        else if (p.name != "list") file.seekg(p.size, std::ios::cur);
+                    }
+                    // Since we triangulate, we might need to duplicate face color
+                    for (int j = 1; j < n - 1; ++j) mesh.faceColors.back() = fc;
+                }
             }
         } else if (e.isTristrip) {
             for (int i = 0; i < e.count; ++i) {
@@ -145,6 +179,76 @@ bool MeshIO::readPLY(const std::string& filename, Mesh& mesh) {
     return true;
 }
 
+bool MeshIO::writePLY(const std::string& filename, const Mesh& mesh) {
+    std::ofstream out(filename, std::ios::binary);
+    if (!out) return false;
+
+    out << "ply\n";
+    out << "format binary_little_endian 1.0\n";
+    out << "element vertex " << mesh.vertices.size() << "\n";
+    out << "property float x\n";
+    out << "property float y\n";
+    out << "property float z\n";
+    bool hasNormals = mesh.vertexNormals.size() == mesh.vertices.size();
+    if (hasNormals) {
+        out << "property float nx\n";
+        out << "property float ny\n";
+        out << "property float nz\n";
+    }
+    bool hasVertexColors = mesh.vertexColors.size() == mesh.vertices.size();
+    if (hasVertexColors) {
+        out << "property uchar red\n";
+        out << "property uchar green\n";
+        out << "property uchar blue\n";
+    }
+    out << "element face " << mesh.triangles.size() << "\n";
+    out << "property list uchar uint vertex_indices\n";
+    bool hasFaceColors = mesh.faceColors.size() == mesh.triangles.size();
+    if (hasFaceColors) {
+        out << "property uchar red\n";
+        out << "property uchar green\n";
+        out << "property uchar blue\n";
+    }
+    out << "end_header\n";
+
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+        out.write((char*)&mesh.vertices[i].x, 4);
+        out.write((char*)&mesh.vertices[i].y, 4);
+        out.write((char*)&mesh.vertices[i].z, 4);
+        if (hasNormals) {
+            out.write((char*)&mesh.vertexNormals[i].x, 4);
+            out.write((char*)&mesh.vertexNormals[i].y, 4);
+            out.write((char*)&mesh.vertexNormals[i].z, 4);
+        }
+        if (hasVertexColors) {
+            unsigned char r = (unsigned char)(std::clamp(mesh.vertexColors[i].x, 0.0f, 1.0f) * 255);
+            unsigned char g = (unsigned char)(std::clamp(mesh.vertexColors[i].y, 0.0f, 1.0f) * 255);
+            unsigned char b = (unsigned char)(std::clamp(mesh.vertexColors[i].z, 0.0f, 1.0f) * 255);
+            out.write((char*)&r, 1);
+            out.write((char*)&g, 1);
+            out.write((char*)&b, 1);
+        }
+    }
+
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
+        unsigned char n = 3;
+        out.write((char*)&n, 1);
+        out.write((char*)&mesh.triangles[i].v0, 4);
+        out.write((char*)&mesh.triangles[i].v1, 4);
+        out.write((char*)&mesh.triangles[i].v2, 4);
+        if (hasFaceColors) {
+            unsigned char r = (unsigned char)(std::clamp(mesh.faceColors[i].x, 0.0f, 1.0f) * 255);
+            unsigned char g = (unsigned char)(std::clamp(mesh.faceColors[i].y, 0.0f, 1.0f) * 255);
+            unsigned char b = (unsigned char)(std::clamp(mesh.faceColors[i].z, 0.0f, 1.0f) * 255);
+            out.write((char*)&r, 1);
+            out.write((char*)&g, 1);
+            out.write((char*)&b, 1);
+        }
+    }
+
+    return true;
+}
+
 bool MeshIO::loadWithAssimp(const std::string& filename, Mesh& mesh) {
     Assimp::Importer importer;
     const aiScene* aiS = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
@@ -167,11 +271,48 @@ bool MeshIO::loadWithAssimp(const std::string& filename, Mesh& mesh) {
 }
 
 bool MeshIO::save(const std::string& filename, const Mesh& mesh) {
+    std::string ext = "";
+    size_t dot = filename.find_last_of(".");
+    if (dot != std::string::npos) ext = filename.substr(dot + 1);
+
+    if (ext == "ply") {
+        return writePLY(filename, mesh);
+    }
+
     std::ofstream out(filename);
     if (!out) return false;
-    out << "OFF\n" << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
-    for (const auto& v : mesh.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
-    for (const auto& t : mesh.triangles) out << "3 " << t.v0 << " " << t.v1 << " " << t.v2 << "\n";
+
+    bool hasNormals = mesh.vertexNormals.size() == mesh.vertices.size();
+    bool hasVertexColors = mesh.vertexColors.size() == mesh.vertices.size();
+    bool hasFaceColors = mesh.faceColors.size() == mesh.triangles.size();
+
+    if (hasNormals && hasVertexColors) out << "CNOFF\n";
+    else if (hasNormals) out << "NOFF\n";
+    else if (hasVertexColors) out << "COFF\n";
+    else out << "OFF\n";
+
+    out << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
+    
+    // Vertices
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+        out << mesh.vertices[i].x << " " << mesh.vertices[i].y << " " << mesh.vertices[i].z;
+        if (hasNormals) {
+            out << " " << mesh.vertexNormals[i].x << " " << mesh.vertexNormals[i].y << " " << mesh.vertexNormals[i].z;
+        }
+        if (hasVertexColors) {
+            out << " " << mesh.vertexColors[i].x << " " << mesh.vertexColors[i].y << " " << mesh.vertexColors[i].z << " 1.0";
+        }
+        out << "\n";
+    }
+
+    // Faces
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
+        out << "3 " << mesh.triangles[i].v0 << " " << mesh.triangles[i].v1 << " " << mesh.triangles[i].v2;
+        if (hasFaceColors) {
+            out << " " << mesh.faceColors[i].x << " " << mesh.faceColors[i].y << " " << mesh.faceColors[i].z << " 1.0";
+        }
+        out << "\n";
+    }
     return true;
 }
 
