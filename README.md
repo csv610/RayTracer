@@ -6,6 +6,7 @@ A collection of C++ applications demonstrating various ray tracing techniques an
 
 - `app/`: Source code for the main ray tracing and analysis applications.
 - `src/`: Core logic, shared utility headers, and unit tests.
+- `tests/`: Shell script tests and C++ unit tests for all apps.
 - `dataset/`: Sample 3D meshes (OFF format).
 - `build/`: Build artifacts and generated renders.
 
@@ -27,9 +28,42 @@ cmake ..
 make -j$(nproc)
 ```
 
-### 2. Run Unit Tests
+### 2. Run Tests
 ```bash
-./test_mesh_utils
+# Run C++ unit tests
+cd build
+ctest --output-on-failure
+
+# Or run shell script tests manually
+cd ..
+./tests/test_mass_properties.sh
+./tests/test_symmetry_detection.sh
+# ... (see tests/ directory for all tests)
+```
+
+## Testing
+
+This project includes comprehensive tests for all applications:
+
+### C++ Unit Tests (`test_apps`)
+- `test_mesh_utils` - Mesh utility functions
+- `test_mesh_io` - File I/O operations
+- `test_aabb` - Bounding box operations
+- `test_jet_color` - Color mapping
+- `test_physical_properties` - Volume, center of mass, inertia tensor
+- `test_symmetry_detector` - Symmetry plane detection
+- `test_structural_caliper` - Wall thickness analysis
+- `test_manufacturing_analyzer` - Draft angles, undercuts, overhangs
+- `test_assembly_analyzer` - Clearance, extraction path
+- `test_geometry_analyzer` - Ambient occlusion, sky view factor
+
+### Shell Script Tests (`tests/*.sh`)
+All 23 single-mesh applications have automated tests that verify correct execution and output generation.
+
+Run all tests:
+```bash
+cd build
+ctest --output-on-failure
 ```
 
 ## Applications
@@ -54,6 +88,10 @@ make -j$(nproc)
 - **projected_thickness**: Computes vertex-based projected thickness along surface normals.
 - **curvature_analysis**: Computes Gaussian and mean curvature, along with concavity scores.
 - **mesh_voxelizer**: Converts a triangular mesh into a voxel grid representation using parity-based interior testing.
+- **sdf_generator**: Generates a signed distance field grid around the mesh.
+- **mesh_visibility**: Computes per-face visibility using hemispherical ray sampling.
+- **sample_interior**: Samples random points inside the mesh volume.
+- **sample_near_surface**: Samples points near the mesh surface (outside, inside, or on surface).
 
 ### Rendering & Visualization
 - **raytracer**: Basic mesh rendering with normal-based shading.

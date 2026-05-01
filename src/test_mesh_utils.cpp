@@ -1,4 +1,5 @@
 #include "mesh_utils.h"
+#include "MeshIO.h"
 #include <cassert>
 #include <iostream>
 #include <vector>
@@ -57,7 +58,7 @@ void test_readOFF() {
     file.close();
 
     Mesh mesh;
-    bool success = readOFF(filename, mesh);
+    bool success = MeshIO::load(filename, mesh);
     assert(success);
     assert(mesh.vertices.size() == 3);
     assert(mesh.triangles.size() == 1);

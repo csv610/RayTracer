@@ -165,3 +165,25 @@ bool MeshIO::loadWithAssimp(const std::string& filename, Mesh& mesh) {
     }
     return true;
 }
+
+bool MeshIO::save(const std::string& filename, const Mesh& mesh) {
+    std::ofstream out(filename);
+    if (!out) return false;
+    out << "OFF\n" << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
+    for (const auto& v : mesh.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
+    for (const auto& t : mesh.triangles) out << "3 " << t.v0 << " " << t.v1 << " " << t.v2 << "\n";
+    return true;
+}
+
+bool MeshIO::savePPM(const std::string& filename, int width, int height, const std::vector<Vec3>& image) {
+    std::ofstream out(filename, std::ios::binary);
+    if (!out) return false;
+    out << "P6\n" << width << " " << height << "\n255\n";
+    for (const auto& c : image) {
+        unsigned char r = (unsigned char)(std::clamp(c.x, 0.0f, 1.0f) * 255);
+        unsigned char g = (unsigned char)(std::clamp(c.y, 0.0f, 1.0f) * 255);
+        unsigned char b = (unsigned char)(std::clamp(c.z, 0.0f, 1.0f) * 255);
+        out << r << g << b;
+    }
+    return true;
+}
