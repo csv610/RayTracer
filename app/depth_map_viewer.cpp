@@ -15,21 +15,6 @@
 #include <QGLViewer/qglviewer.h>
 #include <QKeyEvent>
 
-struct AABB {
-    Vec3 min = {1e20f, 1e20f, 1e20f};
-    Vec3 max = {-1e20f, -1e20f, -1e20f};
-    void expand(const Vertex& v) {
-        min.x = std::min(min.x, v.x); min.y = std::min(min.y, v.y); min.z = std::min(min.z, v.z);
-        max.x = std::max(max.x, v.x); max.y = std::max(max.y, v.y); max.z = std::max(max.z, v.z);
-    }
-    void pad(float f) {
-        Vec3 s = size();
-        min.x -= s.x * f; min.y -= s.y * f; min.z -= s.z * f;
-        max.x += s.x * f; max.y += s.y * f; max.z += s.z * f;
-    }
-    Vec3 size() const { return {max.x - min.x, max.y - min.y, max.z - min.z}; }
-};
-
 class DepthMapVis : public QGLViewer {
 public:
     DepthMapVis(const std::string& filename, bool startWithTextures = true) 
