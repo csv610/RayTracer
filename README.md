@@ -41,6 +41,10 @@ make -j$(nproc)
 - **overhang_analysis**: Flags surfaces requiring support material in 3D printing based on a critical angle threshold.
 - **draft_angle_analysis**: Calculates and visualizes draft angles for moldability analysis.
 - **mass_properties**: Calculates Volume, Center of Mass, and Inertia Tensor using high-density ray integration.
+- **auto_orientation**: Finds the optimal build orientation to minimize support material for 3D printing.
+- **ray_traced_slicer**: Generates high-resolution 2D slice bitmaps for resin/DLP 3D printing.
+- **cnc_toolpath_sim**: Simulates material removal and scallop height for CNC milling verification.
+- **inter_part_visibility**: Analyzes line-of-sight visibility of a part from a viewer's perspective within an assembly.
 - **sky_view_factor**: Computes the Sky View Factor (global visibility) for every face.
 - **extraction_path_verification**: Checks if a part can be removed from an environment along a translation vector without collisions.
 - **optimal_parting_line**: Automatically finds the best pull direction to minimize undercuts for mold design.

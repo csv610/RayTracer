@@ -80,6 +80,18 @@ target_link_libraries(projected_thickness PRIVATE embree TBB::tbb assimp::assimp
 add_executable(mass_properties app/mass_properties.cpp src/MeshIO.cpp)
 target_link_libraries(mass_properties PRIVATE embree TBB::tbb assimp::assimp)
 
+add_executable(auto_orientation app/auto_orientation.cpp src/MeshIO.cpp)
+target_link_libraries(auto_orientation PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(ray_traced_slicer app/ray_traced_slicer.cpp src/MeshIO.cpp)
+target_link_libraries(ray_traced_slicer PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(cnc_toolpath_sim app/cnc_toolpath_sim.cpp src/MeshIO.cpp)
+target_link_libraries(cnc_toolpath_sim PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(inter_part_visibility app/inter_part_visibility.cpp src/MeshIO.cpp)
+target_link_libraries(inter_part_visibility PRIVATE embree TBB::tbb assimp::assimp)
+
 add_executable(sky_view_factor app/sky_view_factor.cpp src/MeshIO.cpp)
 target_link_libraries(sky_view_factor PRIVATE embree TBB::tbb assimp::assimp)
 

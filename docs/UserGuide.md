@@ -40,6 +40,26 @@ Calculates the angle between the face normal and the pull direction to ensure mo
 - **Usage:** `./draft_angle_analysis <mesh.off> [pull_x pull_y pull_z] [output.off]`
 - **Color Scale:** Heatmap from Red (undercut/low draft) to Green (safe draft angle > 3°).
 
+### Auto-Orientation (`auto_orientation`)
+Finds the rotation that minimizes the volume of support material needed for 3D printing.
+- **Usage:** `./auto_orientation <mesh.off> [num_samples]`
+- **Output:** Lists the top orientations based on estimated support volume.
+
+### Ray-Traced Slicer (`ray_traced_slicer`)
+Generates high-resolution slice images for resin 3D printers.
+- **Usage:** `./ray_traced_slicer <mesh.off> <num_layers> [resolution]`
+- **Output:** Saves periodic layer bitmaps as `.ppm` files.
+
+### CNC Toolpath Simulation (`cnc_toolpath_sim`)
+Simulates a ball-end milling tool scraping the mesh to visualize the final surface quality.
+- **Usage:** `./cnc_toolpath_sim <mesh.off> [resolution] [tool_radius] [output.off]`
+- **Visualization:** Blue (perfect match) to Red (high scallop/leftover material).
+
+### Inter-Part Visibility (`inter_part_visibility`)
+Analyzes if a specific part is visible to a technician/viewer from a given point in an assembly.
+- **Usage:** `./inter_part_visibility <target.off> <environment.off> <viewer_x viewer_y viewer_z> [output.off]`
+- **Visualization:** Green (Visible) to Red (Occluded).
+
 ### Optimal Parting Line (`optimal_parting_line`)
 Automatically finds the pull direction that minimizes the number of undercuts in a part.
 - **Usage:** `./optimal_parting_line <mesh.off> [num_search_directions]`
