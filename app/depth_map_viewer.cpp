@@ -9,6 +9,7 @@
 #include "mesh_utils.h"
 #include "MeshIO.h"
 #include "ShapeDiameter.h"
+#include <tbb/parallel_for.h>
 
 #include <QApplication>
 #include <QGLViewer/qglviewer.h>
@@ -21,12 +22,18 @@ struct AABB {
         min.x = std::min(min.x, v.x); min.y = std::min(min.y, v.y); min.z = std::min(min.z, v.z);
         max.x = std::max(max.x, v.x); max.y = std::max(max.y, v.y); max.z = std::max(max.z, v.z);
     }
+    void pad(float f) {
+        Vec3 s = size();
+        min.x -= s.x * f; min.y -= s.y * f; min.z -= s.z * f;
+        max.x += s.x * f; max.y += s.y * f; max.z += s.z * f;
+    }
     Vec3 size() const { return {max.x - min.x, max.y - min.y, max.z - min.z}; }
 };
 
 class DepthMapVis : public QGLViewer {
 public:
-    DepthMapVis(const std::string& filename) : inputFile(filename) {
+    DepthMapVis(const std::string& filename, bool startWithTextures = true) 
+        : inputFile(filename), showTextures(startWithTextures) {
         for(int i=0; i<6; ++i) textures[i] = 0;
     }
     ~DepthMapVis() {
@@ -49,6 +56,7 @@ private:
     GLuint textures[6];
     int res = 512;
     bool showBox = true;
+    bool showTextures = true;
     bool showWireframe = false;
     bool showLighting = true;
     bool showSmoothShading = true;
@@ -61,6 +69,7 @@ private:
     void computeDepthMaps();
     void createTexture(int idx, const std::vector<unsigned char>& data);
     void drawBoxPlanes();
+    void drawBoxWireframe();
     void drawMesh();
     void setupVBOs();
 };
@@ -71,6 +80,7 @@ void DepthMapVis::loadMesh() {
         exit(1);
     }
     for (const auto& v : mesh.vertices) box.expand(v);
+    box.pad(0.01f); // 1% padding to avoid Z-fighting and "zoomed in" feel
 
     std::cout << "Loaded mesh: " << mesh.vertices.size() << " vertices, " << mesh.triangles.size() << " triangles" << std::endl;
     std::cout << "Bounding Box: [" << box.min.x << ", " << box.min.y << ", " << box.min.z << "] - [" << box.max.x << ", " << box.max.y << ", " << box.max.z << "]" << std::endl;
@@ -114,6 +124,8 @@ void DepthMapVis::createTexture(int idx, const std::vector<unsigned char>& data)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, res, res, 0, GL_RGB, GL_UNSIGNED_BYTE, data.data());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 void DepthMapVis::computeDepthMaps() {
@@ -187,7 +199,9 @@ void DepthMapVis::drawMesh() {
 }
 
 void DepthMapVis::drawBoxPlanes() {
-    glDisable(GL_LIGHTING); glEnable(GL_TEXTURE_2D); glColor3f(1, 1, 1);
+    if (!showTextures) return;
+    glDisable(GL_LIGHTING); glEnable(GL_TEXTURE_2D); 
+    glColor4f(1.0f, 1.0f, 1.0f, 0.8f);
     glBindTexture(GL_TEXTURE_2D, textures[0]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.min.x, box.min.y, box.max.z); glTexCoord2f(1,1); glVertex3f(box.min.x, box.max.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.min.z); glEnd();
     glBindTexture(GL_TEXTURE_2D, textures[1]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.max.x, box.min.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.max.z); glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.max.x, box.max.y, box.min.z); glEnd();
     glBindTexture(GL_TEXTURE_2D, textures[2]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.min.z); glTexCoord2f(1,1); glVertex3f(box.max.x, box.min.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.min.x, box.min.y, box.max.z); glEnd();
@@ -197,18 +211,49 @@ void DepthMapVis::drawBoxPlanes() {
     glDisable(GL_TEXTURE_2D);
 }
 
+void DepthMapVis::drawBoxWireframe() {
+    glDisable(GL_LIGHTING);
+    glLineWidth(2.0f);
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glBegin(GL_LINES);
+    // Bottom
+    glVertex3f(box.min.x, box.min.y, box.min.z); glVertex3f(box.max.x, box.min.y, box.min.z);
+    glVertex3f(box.max.x, box.min.y, box.min.z); glVertex3f(box.max.x, box.min.y, box.max.z);
+    glVertex3f(box.max.x, box.min.y, box.max.z); glVertex3f(box.min.x, box.min.y, box.max.z);
+    glVertex3f(box.min.x, box.min.y, box.max.z); glVertex3f(box.min.x, box.min.y, box.min.z);
+    // Top
+    glVertex3f(box.min.x, box.max.y, box.min.z); glVertex3f(box.max.x, box.max.y, box.min.z);
+    glVertex3f(box.max.x, box.max.y, box.min.z); glVertex3f(box.max.x, box.max.y, box.max.z);
+    glVertex3f(box.max.x, box.max.y, box.max.z); glVertex3f(box.min.x, box.max.y, box.max.z);
+    glVertex3f(box.min.x, box.max.y, box.max.z); glVertex3f(box.min.x, box.max.y, box.min.z);
+    // Verticals
+    glVertex3f(box.min.x, box.min.y, box.min.z); glVertex3f(box.min.x, box.max.y, box.min.z);
+    glVertex3f(box.max.x, box.min.y, box.min.z); glVertex3f(box.max.x, box.max.y, box.min.z);
+    glVertex3f(box.max.x, box.min.y, box.max.z); glVertex3f(box.max.x, box.max.y, box.max.z);
+    glVertex3f(box.min.x, box.min.y, box.max.z); glVertex3f(box.min.x, box.max.y, box.max.z);
+    glEnd();
+    glLineWidth(1.0f);
+}
+
 void DepthMapVis::draw() {
     drawMesh();
     if (showBox) { 
-        glEnable(GL_BLEND); 
+        glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         drawBoxPlanes(); 
+        drawBoxWireframe();
+        glDisable(GL_BLEND);
     }
 }
 
 void DepthMapVis::keyPressEvent(QKeyEvent* e) {
     if (e->key() == Qt::Key_Escape) exit(0);
     else if (e->key() == Qt::Key_B) { showBox = !showBox; update(); }
+    else if (e->key() == Qt::Key_T) { showTextures = !showTextures; update(); }
+    else if (e->key() == Qt::Key_V) { 
+        camera()->setType(camera()->type() == qglviewer::Camera::PERSPECTIVE ? qglviewer::Camera::ORTHOGRAPHIC : qglviewer::Camera::PERSPECTIVE); 
+        update(); 
+    }
     else if (e->key() == Qt::Key_W) { showWireframe = !showWireframe; update(); }
     else if (e->key() == Qt::Key_L) { showLighting = !showLighting; update(); }
     else if (e->key() == Qt::Key_S) { showSmoothShading = !showSmoothShading; update(); }
@@ -216,9 +261,22 @@ void DepthMapVis::keyPressEvent(QKeyEvent* e) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) { std::cerr << "Usage: " << argv[0] << " <model_file>" << std::endl; return 1; }
+    std::string modelFile = "";
+    bool showTextures = true;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-t") showTextures = false;
+        else modelFile = arg;
+    }
+
+    if (modelFile.empty()) { 
+        std::cerr << "Usage: " << argv[0] << " [-t] <model_file>" << std::endl; 
+        std::cerr << "  -t: Start with textures disabled" << std::endl;
+        return 1; 
+    }
+
     QApplication app(argc, argv);
-    DepthMapVis viewer(argv[1]);
+    DepthMapVis viewer(modelFile, showTextures);
     viewer.setWindowTitle("Bounding Box Depth Maps");
     viewer.resize(1000, 1000);
     viewer.show();
