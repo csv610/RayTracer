@@ -35,6 +35,12 @@ target_link_libraries(depth_map PRIVATE embree TBB::tbb assimp::assimp)
 add_executable(ao_baker app/ambient_occlusion_baker.cpp src/MeshIO.cpp)
 target_link_libraries(ao_baker PRIVATE embree TBB::tbb assimp::assimp)
 
+add_executable(sample_interior app/sample_interior.cpp src/MeshIO.cpp src/SampleInterior.cpp)
+target_link_libraries(sample_interior PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(sample_near_surface app/sample_near_surface.cpp src/MeshIO.cpp src/SampleSurface.cpp)
+target_link_libraries(sample_near_surface PRIVATE embree TBB::tbb assimp::assimp)
+
 add_executable(test_mesh_utils src/test_mesh_utils.cpp src/MeshIO.cpp)
 target_link_libraries(test_mesh_utils PRIVATE assimp::assimp)
 
