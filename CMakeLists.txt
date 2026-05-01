@@ -44,6 +44,21 @@ target_link_libraries(sample_near_surface PRIVATE embree TBB::tbb assimp::assimp
 add_executable(sdf_gen app/sdf_generator.cpp src/MeshIO.cpp)
 target_link_libraries(sdf_gen PRIVATE embree TBB::tbb assimp::assimp)
 
+add_executable(caliper app/structural_caliper.cpp src/MeshIO.cpp src/SampleSurface.cpp src/StructuralCaliper.cpp)
+target_link_libraries(caliper PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(curvature_analysis app/curvature_analysis.cpp src/MeshIO.cpp)
+target_link_libraries(curvature_analysis PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(symmetry_detection app/symmetry_detection.cpp src/MeshIO.cpp src/SampleSurface.cpp src/SymmetryDetector.cpp)
+target_link_libraries(symmetry_detection PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(pocket_detection app/pocket_detection.cpp src/MeshIO.cpp)
+target_link_libraries(pocket_detection PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(test_symmetry_sphere app/test_symmetry_sphere.cpp src/MeshIO.cpp src/SampleSurface.cpp src/SymmetryDetector.cpp)
+target_link_libraries(test_symmetry_sphere PRIVATE embree TBB::tbb assimp::assimp)
+
 add_executable(test_mesh_utils src/test_mesh_utils.cpp src/MeshIO.cpp)
 target_link_libraries(test_mesh_utils PRIVATE assimp::assimp)
 
