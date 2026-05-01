@@ -13,6 +13,13 @@ Verifies if a 3-axis CNC milling tool can reach specific regions of a mesh witho
   - **Green:** Accessible regions.
   - **Red:** Inaccessible regions (due to verticality or tool-shaft collision).
 
+### Extraction Path Verification (`extraction_path_verification`)
+Checks if a part can be physically removed from an assembly or environment along a linear translation path.
+- **Usage:** `./extraction_path_verification <part.off> <environment.off> [dir_x dir_y dir_z] [distance] [output.off]`
+- **Visualization:**
+  - **Red:** Triangles that will collide with the environment during extraction.
+  - **Green:** Triangles with a clear path.
+
 ### Assembly Clearance & Collision (`assembly_clearance`)
 Detects hard collisions and clearance tolerance violations between two parts.
 - **Usage:** `./assembly_clearance <partA.off> <partB.off> [clearance_threshold] [outputA_colored.off]`
@@ -32,6 +39,22 @@ Identifies areas that cannot be ejected from a two-part mold along a specific pu
 Calculates the angle between the face normal and the pull direction to ensure moldability.
 - **Usage:** `./draft_angle_analysis <mesh.off> [pull_x pull_y pull_z] [output.off]`
 - **Color Scale:** Heatmap from Red (undercut/low draft) to Green (safe draft angle > 3°).
+
+### Optimal Parting Line (`optimal_parting_line`)
+Automatically finds the pull direction that minimizes the number of undercuts in a part.
+- **Usage:** `./optimal_parting_line <mesh.off> [num_search_directions]`
+- **Output:** Lists the top 5 pull directions with their respective undercut percentages.
+
+### Mass Properties (`mass_properties`)
+Calculates the physical properties of the mesh (Volume, CoM, Inertia).
+- **Usage:** `./mass_properties <mesh.off> [resolution]`
+- **Note:** Requires a closed, manifold mesh for accurate volume calculation. Resolution defaults to 128.
+- **Output:** Prints the Volume, Center of Mass coordinates, and the 3x3 Inertia Tensor at the CoM.
+
+### Sky View Factor (`sky_view_factor`)
+Calculates the percentage of the sky visible from each face.
+- **Usage:** `./sky_view_factor <mesh.off> [samples] [output.off]`
+- **Visualization:** Blue (low visibility) to Red (high visibility).
 
 ### Pocket Detection (`pocket_detection`)
 Identifies deep, concave regions or "pockets" using hemispherical ray casting.

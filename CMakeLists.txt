@@ -77,6 +77,21 @@ target_link_libraries(mesh_voxelizer PRIVATE embree TBB::tbb assimp::assimp)
 add_executable(projected_thickness app/projected_thickness.cpp src/MeshIO.cpp)
 target_link_libraries(projected_thickness PRIVATE embree TBB::tbb assimp::assimp)
 
+add_executable(mass_properties app/mass_properties.cpp src/MeshIO.cpp)
+target_link_libraries(mass_properties PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(sky_view_factor app/sky_view_factor.cpp src/MeshIO.cpp)
+target_link_libraries(sky_view_factor PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(extraction_path_verification app/extraction_path_verification.cpp src/MeshIO.cpp)
+target_link_libraries(extraction_path_verification PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(optimal_parting_line app/optimal_parting_line.cpp src/MeshIO.cpp)
+target_link_libraries(optimal_parting_line PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(test_mass_sphere app/test_mass_sphere.cpp src/MeshIO.cpp)
+target_link_libraries(test_mass_sphere PRIVATE embree TBB::tbb assimp::assimp)
+
 add_executable(test_symmetry_sphere app/test_symmetry_sphere.cpp src/MeshIO.cpp src/SampleSurface.cpp src/SymmetryDetector.cpp)
 target_link_libraries(test_symmetry_sphere PRIVATE embree TBB::tbb assimp::assimp)
 

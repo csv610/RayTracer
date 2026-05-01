@@ -40,6 +40,10 @@ make -j$(nproc)
 - **undercut_detection**: Identifies structural and occluded undercuts relative to a specified pull direction for injection molding.
 - **overhang_analysis**: Flags surfaces requiring support material in 3D printing based on a critical angle threshold.
 - **draft_angle_analysis**: Calculates and visualizes draft angles for moldability analysis.
+- **mass_properties**: Calculates Volume, Center of Mass, and Inertia Tensor using high-density ray integration.
+- **sky_view_factor**: Computes the Sky View Factor (global visibility) for every face.
+- **extraction_path_verification**: Checks if a part can be removed from an environment along a translation vector without collisions.
+- **optimal_parting_line**: Automatically finds the best pull direction to minimize undercuts for mold design.
 - **accessibility_analysis**: Verifies if mesh regions are reachable by a 3-axis CNC tool of a given radius.
 - **assembly_clearance**: Detects collisions and clearance violations between two distinct mesh parts.
 - **structural_caliper**: Analyzes local mesh thickness using inward ray casting to identify thin wall regions.
