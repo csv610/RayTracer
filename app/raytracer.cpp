@@ -13,9 +13,8 @@ int main(int argc, char** argv) {
     std::string inputFile = argv[1];
     std::string outputFile = (argc >= 3) ? argv[2] : "render.ppm";
 
-    std::vector<Vertex> vertices;
-    std::vector<Triangle> triangles;
-    if (!readOFF(inputFile, vertices, triangles)) {
+    Mesh mesh;
+    if (!readOFF(inputFile, mesh)) {
         std::cerr << "Failed to load mesh: " << inputFile << std::endl;
         return 1;
     }
@@ -24,11 +23,11 @@ int main(int argc, char** argv) {
     RTCScene scene = rtcNewScene(device);
     RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
 
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), vertices.size());
-    for(size_t i=0; i<vertices.size(); ++i) vb[i] = vertices[i];
+    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
+    for(size_t i=0; i<mesh.vertices.size(); ++i) vb[i] = mesh.vertices[i];
 
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), triangles.size());
-    for(size_t i=0; i<triangles.size(); ++i) ib[i] = triangles[i];
+    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
+    for(size_t i=0; i<mesh.triangles.size(); ++i) ib[i] = mesh.triangles[i];
 
     rtcCommitGeometry(geom);
     rtcAttachGeometry(scene, geom);
@@ -37,7 +36,7 @@ int main(int argc, char** argv) {
 
     Vertex center;
     float radius;
-    computeBoundingSphere(vertices, center, radius);
+    computeBoundingSphere(mesh, center, radius);
 
     int width = 800;
     int height = 600;

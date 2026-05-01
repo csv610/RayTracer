@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <cstdio>
 
 void test_computeFaceNormal() {
     Vertex v0 = {0, 0, 0};
@@ -27,12 +28,13 @@ void test_computeFaceCenter() {
 }
 
 void test_computeBoundingSphere() {
-    std::vector<Vertex> vertices = {
+    Mesh mesh;
+    mesh.vertices = {
         {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}
     };
     Vertex center;
     float radius;
-    computeBoundingSphere(vertices, center, radius);
+    computeBoundingSphere(mesh, center, radius);
     assert(std::abs(center.x) < 1e-6);
     assert(std::abs(center.y) < 1e-6);
     assert(std::abs(center.z) < 1e-6);
@@ -41,11 +43,10 @@ void test_computeBoundingSphere() {
 }
 
 void test_createUVSphere() {
-    std::vector<Vertex> vertices;
-    std::vector<Triangle> triangles;
-    createUVSphere(vertices, triangles, 10, 10, 1.0f);
-    assert(!vertices.empty());
-    assert(!triangles.empty());
+    Mesh mesh;
+    createUVSphere(mesh, 10, 10, 1.0f);
+    assert(!mesh.vertices.empty());
+    assert(!mesh.triangles.empty());
     std::cout << "test_createUVSphere passed!" << std::endl;
 }
 
@@ -55,15 +56,14 @@ void test_readOFF() {
     file << "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1 2\n";
     file.close();
 
-    std::vector<Vertex> vertices;
-    std::vector<Triangle> triangles;
-    bool success = readOFF(filename, vertices, triangles);
+    Mesh mesh;
+    bool success = readOFF(filename, mesh);
     assert(success);
-    assert(vertices.size() == 3);
-    assert(triangles.size() == 1);
-    assert(triangles[0].v0 == 0);
-    assert(triangles[0].v1 == 1);
-    assert(triangles[0].v2 == 2);
+    assert(mesh.vertices.size() == 3);
+    assert(mesh.triangles.size() == 1);
+    assert(mesh.triangles[0].v0 == 0);
+    assert(mesh.triangles[0].v1 == 1);
+    assert(mesh.triangles[0].v2 == 2);
     
     std::remove(filename);
     std::cout << "test_readOFF passed!" << std::endl;

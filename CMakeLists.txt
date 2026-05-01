@@ -50,5 +50,18 @@ target_link_libraries(shape_diameter_vis PRIVATE
     /Users/csv610/Projects/Mesh/libQGLViewer/QGLViewer/libQGLViewer.dylib
 )
 
+# Depth Map Viewer Target
+add_executable(depth_map_viewer app/depth_map_viewer.cpp)
+target_include_directories(depth_map_viewer PRIVATE /Users/csv610/Projects/Mesh/libQGLViewer)
+target_link_libraries(depth_map_viewer PRIVATE 
+    embree 
+    assimp::assimp
+    Qt6::Widgets 
+    Qt6::Xml 
+    Qt6::OpenGLWidgets 
+    OpenGL::GL
+    /Users/csv610/Projects/Mesh/libQGLViewer/QGLViewer/libQGLViewer.dylib
+)
+
 enable_testing()
 add_test(NAME MeshUtilsTest COMMAND test_mesh_utils)

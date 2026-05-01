@@ -13,9 +13,8 @@ int main(int argc, char** argv) {
     std::string inputFile = argv[1];
     std::string outputFile = (argc >= 3) ? argv[2] : "shadow.ppm";
 
-    std::vector<Vertex> vertices;
-    std::vector<Triangle> triangles;
-    if (!readOFF(inputFile, vertices, triangles)) {
+    Mesh mesh;
+    if (!readOFF(inputFile, mesh)) {
         std::cerr << "Failed to load mesh: " << inputFile << std::endl;
         return 1;
     }
@@ -25,10 +24,10 @@ int main(int argc, char** argv) {
 
     // Add Mesh
     RTCGeometry meshGeom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(meshGeom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), vertices.size());
-    for(size_t i=0; i<vertices.size(); ++i) vb[i] = vertices[i];
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(meshGeom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), triangles.size());
-    for(size_t i=0; i<triangles.size(); ++i) ib[i] = triangles[i];
+    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(meshGeom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
+    for(size_t i=0; i<mesh.vertices.size(); ++i) vb[i] = mesh.vertices[i];
+    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(meshGeom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
+    for(size_t i=0; i<mesh.triangles.size(); ++i) ib[i] = mesh.triangles[i];
     rtcCommitGeometry(meshGeom);
     unsigned int meshID = rtcAttachGeometry(scene, meshGeom);
     rtcReleaseGeometry(meshGeom);
@@ -36,7 +35,7 @@ int main(int argc, char** argv) {
     // Compute bounding sphere to place plane and camera
     Vertex center;
     float radius;
-    computeBoundingSphere(vertices, center, radius);
+    computeBoundingSphere(mesh, center, radius);
 
     // Add Ground Plane (a large square)
     RTCGeometry planeGeom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);

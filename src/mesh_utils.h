@@ -11,30 +11,31 @@ struct Vertex { float x, y, z; };
 struct Triangle { unsigned int v0, v1, v2; };
 struct Vec3 { float x, y, z; };
 
-inline bool readOFF(const std::string& filename, std::vector<Vertex>& vertices, std::vector<Triangle>& triangles) {
+struct Mesh {
+    std::vector<Vertex> vertices;
+    std::vector<Triangle> triangles;
+};
+
+inline bool readOFF(const std::string& filename, Mesh& mesh) {
     std::ifstream file(filename);
-    if (!file.is_open()) {
-        return false;
-    }
+    if (!file.is_open()) return false;
 
     std::string header;
     file >> header;
-    if (header != "OFF" && header != "off") {
-        return false;
-    }
+    if (header != "OFF" && header != "off") return false;
 
     int nVerts, nTris, nEdges;
     if (!(file >> nVerts >> nTris >> nEdges)) return false;
 
-    vertices.resize(nVerts);
+    mesh.vertices.resize(nVerts);
     for (int i = 0; i < nVerts; ++i) {
-        if (!(file >> vertices[i].x >> vertices[i].y >> vertices[i].z)) return false;
+        if (!(file >> mesh.vertices[i].x >> mesh.vertices[i].y >> mesh.vertices[i].z)) return false;
     }
 
-    triangles.resize(nTris);
+    mesh.triangles.resize(nTris);
     for (int i = 0; i < nTris; ++i) {
         int n;
-        if (!(file >> n >> triangles[i].v0 >> triangles[i].v1 >> triangles[i].v2)) return false;
+        if (!(file >> n >> mesh.triangles[i].v0 >> mesh.triangles[i].v1 >> mesh.triangles[i].v2)) return false;
     }
 
     file.close();
@@ -58,24 +59,24 @@ inline Vec3 computeFaceCenter(const Vertex& v0, const Vertex& v1, const Vertex& 
             (v0.z + v1.z + v2.z) / 3.0f};
 }
 
-inline void computeBoundingSphere(const std::vector<Vertex>& vertices, Vertex& center, float& radius) {
-    if (vertices.empty()) {
+inline void computeBoundingSphere(const Mesh& mesh, Vertex& center, float& radius) {
+    if (mesh.vertices.empty()) {
         center = {0, 0, 0};
         radius = 0;
         return;
     }
     center = {0, 0, 0};
-    for (const auto& v : vertices) {
+    for (const auto& v : mesh.vertices) {
         center.x += v.x;
         center.y += v.y;
         center.z += v.z;
     }
-    center.x /= vertices.size();
-    center.y /= vertices.size();
-    center.z /= vertices.size();
+    center.x /= mesh.vertices.size();
+    center.y /= mesh.vertices.size();
+    center.z /= mesh.vertices.size();
 
     radius = 0;
-    for (const auto& v : vertices) {
+    for (const auto& v : mesh.vertices) {
         float dx = v.x - center.x;
         float dy = v.y - center.y;
         float dz = v.z - center.z;
@@ -96,9 +97,9 @@ inline Vec3 getJetColor(float v) {
 #define M_PI 3.14159265358979323846
 #endif
 
-inline void createUVSphere(std::vector<Vertex>& vertices, std::vector<Triangle>& triangles, int stacks, int slices, float radius) {
-    vertices.clear();
-    triangles.clear();
+inline void createUVSphere(Mesh& mesh, int stacks, int slices, float radius) {
+    mesh.vertices.clear();
+    mesh.triangles.clear();
     for (int i = 0; i <= stacks; ++i) {
         float phi = M_PI * i / stacks;
         for (int j = 0; j <= slices; ++j) {
@@ -106,15 +107,15 @@ inline void createUVSphere(std::vector<Vertex>& vertices, std::vector<Triangle>&
             float x = radius * sin(phi) * cos(theta);
             float y = radius * cos(phi);
             float z = radius * sin(phi) * sin(theta);
-            vertices.push_back({x, y, z});
+            mesh.vertices.push_back({x, y, z});
         }
     }
     for (int i = 0; i < stacks; ++i) {
         for (int j = 0; j < slices; ++j) {
             unsigned int first = (i * (slices + 1)) + j;
             unsigned int second = first + slices + 1;
-            triangles.push_back({first, second, first + 1});
-            triangles.push_back({second, second + 1, first + 1});
+            mesh.triangles.push_back({first, second, first + 1});
+            mesh.triangles.push_back({second, second + 1, first + 1});
         }
     }
 }

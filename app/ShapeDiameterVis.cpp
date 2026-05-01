@@ -9,107 +9,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include "mesh_utils.h"
-
-class ShapeDiameter {
-public:
-    ShapeDiameter(const std::vector<Vertex>& vertices, const std::vector<Triangle>& triangles)
-        : vertices(vertices), triangles(triangles) {
-        device = rtcNewDevice(nullptr);
-        if (device == nullptr) {
-            throw std::runtime_error("Failed to create Embree device");
-        }
-        rtcSetDeviceErrorFunction(device, [](void* userPtr, RTCError code, const char* msg) {
-            printf("Embree error %d: %s\n", code, msg);
-        }, nullptr);
-        scene = rtcNewScene(device);
-        buildScene();
-    }
-
-    ~ShapeDiameter() {
-        rtcReleaseScene(scene);
-        rtcReleaseDevice(device);
-    }
-
-    struct RayHit {
-        int primID;
-        Vec3 dir;
-        float distance;
-    };
-
-    void computeForFace(int triIdx, std::vector<RayHit>& hits, int numTheta = 4, int numPhi = 8, float coneAngle = 0.5f) {
-        hits.clear();
-        if (triIdx < 0 || triIdx >= (int)triangles.size()) return;
-
-        const Triangle& tri = triangles[triIdx];
-        Vec3 normal = computeFaceNormal(vertices[tri.v0], vertices[tri.v1], vertices[tri.v2]);
-        Vec3 inwardNormal = {-normal.x, -normal.y, -normal.z};
-        Vec3 faceCenter = computeFaceCenter(vertices[tri.v0], vertices[tri.v1], vertices[tri.v2]);
-
-        Vec3 up = (std::abs(inwardNormal.z) < 0.9f) ? Vec3{0, 0, 1} : Vec3{1, 0, 0};
-        Vec3 tangent = {inwardNormal.y * up.z - inwardNormal.z * up.y,
-                        inwardNormal.z * up.x - inwardNormal.x * up.z,
-                        inwardNormal.x * up.y - inwardNormal.y * up.x};
-        float tLen = sqrt(tangent.x*tangent.x + tangent.y*tangent.y + tangent.z*tangent.z);
-        tangent.x /= tLen; tangent.y /= tLen; tangent.z /= tLen;
-        Vec3 bitangent = {inwardNormal.y * tangent.z - inwardNormal.z * tangent.y,
-                          inwardNormal.z * tangent.x - inwardNormal.x * tangent.z,
-                          inwardNormal.x * tangent.y - inwardNormal.y * tangent.x};
-
-        for (int i = 0; i < numTheta; ++i) {
-            for (int j = 0; j < numPhi; ++j) {
-                float theta = coneAngle * (i + 0.5f) / numTheta; 
-                float phi = 2.0f * 3.14159f * (j + 0.5f) / numPhi;
-                float sinT = sin(theta); float cosT = cos(theta);
-                float sinP = sin(phi);   float cosP = cos(phi);
-
-                Vec3 rayDir = {
-                    (tangent.x * cosP + bitangent.x * sinP) * sinT + inwardNormal.x * cosT,
-                    (tangent.y * cosP + bitangent.y * sinP) * sinT + inwardNormal.y * cosT,
-                    (tangent.z * cosP + bitangent.z * sinP) * sinT + inwardNormal.z * cosT
-                };
-
-                RTCRayHit rh;
-                float epsilon = 0.0001f;
-                rh.ray.org_x = faceCenter.x + inwardNormal.x * epsilon;
-                rh.ray.org_y = faceCenter.y + inwardNormal.y * epsilon;
-                rh.ray.org_z = faceCenter.z + inwardNormal.z * epsilon;
-                rh.ray.dir_x = rayDir.x; rh.ray.dir_y = rayDir.y; rh.ray.dir_z = rayDir.z;
-                rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = 0xFFFFFFFF;
-                rh.ray.time = 0.0f; rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-
-                RTCIntersectArguments args;
-                rtcInitIntersectArguments(&args);
-                rtcIntersect1(scene, &rh, &args);
-
-                if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-                    hits.push_back({(int)rh.hit.primID, rayDir, rh.ray.tfar});
-                }
-            }
-        }
-    }
-
-private:
-    const std::vector<Vertex>& vertices;
-    const std::vector<Triangle>& triangles;
-    RTCDevice device;
-    RTCScene scene;
-
-    void buildScene() {
-        RTCGeometry triangleMesh = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-
-        Vertex* vertBuffer = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), vertices.size());
-        for (size_t i = 0; i < vertices.size(); ++i) vertBuffer[i] = vertices[i];
-
-        Triangle* triBuffer = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), triangles.size());
-        for (size_t i = 0; i < triangles.size(); ++i) triBuffer[i] = triangles[i];
-
-        rtcSetGeometryBuildQuality(triangleMesh, RTC_BUILD_QUALITY_HIGH);
-        rtcCommitGeometry(triangleMesh);
-        rtcAttachGeometry(scene, triangleMesh);
-        rtcReleaseGeometry(triangleMesh);
-        rtcCommitScene(scene);
-    }
-};
+#include "ShapeDiameter.h"
 
 class ShapeDiameterVis : public QGLViewer {
 public:
@@ -123,8 +23,7 @@ protected:
 
 private:
     std::string inputFile;
-    std::vector<Vertex> vertices;
-    std::vector<Triangle> triangles;
+    Mesh mesh;
     
     ShapeDiameter* sd = nullptr;
     
@@ -149,36 +48,36 @@ void ShapeDiameterVis::loadMesh() {
         exit(1);
     }
 
-    vertices.clear();
-    triangles.clear();
+    mesh.vertices.clear();
+    mesh.triangles.clear();
 
     for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
-        aiMesh* mesh = scene->mMeshes[i];
-        unsigned int offset = vertices.size();
+        aiMesh* aiM = scene->mMeshes[i];
+        unsigned int offset = mesh.vertices.size();
 
-        for (unsigned int j = 0; j < mesh->mNumVertices; ++j) {
-            vertices.push_back({mesh->mVertices[j].x, mesh->mVertices[j].y, mesh->mVertices[j].z});
+        for (unsigned int j = 0; j < aiM->mNumVertices; ++j) {
+            mesh.vertices.push_back({aiM->mVertices[j].x, aiM->mVertices[j].y, aiM->mVertices[j].z});
         }
 
-        for (unsigned int j = 0; j < mesh->mNumFaces; ++j) {
-            aiFace face = mesh->mFaces[j];
+        for (unsigned int j = 0; j < aiM->mNumFaces; ++j) {
+            aiFace face = aiM->mFaces[j];
             if (face.mNumIndices == 3) {
-                triangles.push_back({face.mIndices[0] + offset, face.mIndices[1] + offset, face.mIndices[2] + offset});
+                mesh.triangles.push_back({face.mIndices[0] + offset, face.mIndices[1] + offset, face.mIndices[2] + offset});
             }
         }
     }
-    std::cout << "Mesh loaded with Assimp: " << vertices.size() << " vertices, " << triangles.size() << " triangles" << std::endl;
+    std::cout << "Mesh loaded with Assimp: " << mesh.vertices.size() << " vertices, " << mesh.triangles.size() << " triangles" << std::endl;
 }
 
 void ShapeDiameterVis::init() {
     loadMesh();
-    sd = new ShapeDiameter(vertices, triangles);
+    sd = new ShapeDiameter(mesh);
     
     // Set scene center and radius for rotation and camera fit
-    if (!vertices.empty()) {
-        Vec3 minP = {vertices[0].x, vertices[0].y, vertices[0].z};
-        Vec3 maxP = {vertices[0].x, vertices[0].y, vertices[0].z};
-        for (const auto& v : vertices) {
+    if (!mesh.vertices.empty()) {
+        Vec3 minP = {mesh.vertices[0].x, mesh.vertices[0].y, mesh.vertices[0].z};
+        Vec3 maxP = {mesh.vertices[0].x, mesh.vertices[0].y, mesh.vertices[0].z};
+        for (const auto& v : mesh.vertices) {
             minP.x = std::min(minP.x, v.x); minP.y = std::min(minP.y, v.y); minP.z = std::min(minP.z, v.z);
             maxP.x = std::max(maxP.x, v.x); maxP.y = std::max(maxP.y, v.y); maxP.z = std::max(maxP.z, v.z);
         }
@@ -199,14 +98,14 @@ void ShapeDiameterVis::drawMesh() {
     // Pass 1: Draw regular triangles (not selected or hit)
     glPolygonMode(GL_FRONT_AND_BACK, showWireframe ? GL_LINE : GL_FILL);
     glBegin(GL_TRIANGLES);
-    for (size_t i = 0; i < triangles.size(); ++i) {
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
         bool isHit = std::find(hitTriangles.begin(), hitTriangles.end(), (int)i) != hitTriangles.end();
         if ((int)i != selectedTriangle && !isHit) {
             glColor3f(0.8f, 0.8f, 0.8f); // Default: Light Gray
-            const Triangle& t = triangles[i];
-            const Vertex& v0 = vertices[t.v0];
-            const Vertex& v1 = vertices[t.v1];
-            const Vertex& v2 = vertices[t.v2];
+            const Triangle& t = mesh.triangles[i];
+            const Vertex& v0 = mesh.vertices[t.v0];
+            const Vertex& v1 = mesh.vertices[t.v1];
+            const Vertex& v2 = mesh.vertices[t.v2];
             Vec3 n = computeFaceNormal(v0, v1, v2);
             glNormal3f(n.x, n.y, n.z);
             glVertex3f(v0.x, v0.y, v0.z);
@@ -220,14 +119,14 @@ void ShapeDiameterVis::drawMesh() {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glBegin(GL_TRIANGLES);
     // Draw hit triangles in Red
-    for (size_t i = 0; i < triangles.size(); ++i) {
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
         bool isHit = std::find(hitTriangles.begin(), hitTriangles.end(), (int)i) != hitTriangles.end();
         if (isHit && (int)i != selectedTriangle) {
             glColor3f(1.0f, 0.0f, 0.0f);
-            const Triangle& t = triangles[i];
-            const Vertex& v0 = vertices[t.v0];
-            const Vertex& v1 = vertices[t.v1];
-            const Vertex& v2 = vertices[t.v2];
+            const Triangle& t = mesh.triangles[i];
+            const Vertex& v0 = mesh.vertices[t.v0];
+            const Vertex& v1 = mesh.vertices[t.v1];
+            const Vertex& v2 = mesh.vertices[t.v2];
             Vec3 n = computeFaceNormal(v0, v1, v2);
             glNormal3f(n.x, n.y, n.z);
             glVertex3f(v0.x, v0.y, v0.z);
@@ -238,10 +137,10 @@ void ShapeDiameterVis::drawMesh() {
     // Draw selected triangle in Green
     if (selectedTriangle != -1) {
         glColor3f(0.0f, 1.0f, 0.0f);
-        const Triangle& t = triangles[selectedTriangle];
-        const Vertex& v0 = vertices[t.v0];
-        const Vertex& v1 = vertices[t.v1];
-        const Vertex& v2 = vertices[t.v2];
+        const Triangle& t = mesh.triangles[selectedTriangle];
+        const Vertex& v0 = mesh.vertices[t.v0];
+        const Vertex& v1 = mesh.vertices[t.v1];
+        const Vertex& v2 = mesh.vertices[t.v2];
         Vec3 n = computeFaceNormal(v0, v1, v2);
         glNormal3f(n.x, n.y, n.z);
         glVertex3f(v0.x, v0.y, v0.z);
@@ -253,9 +152,9 @@ void ShapeDiameterVis::drawMesh() {
 
 void ShapeDiameterVis::drawRays() {
     if (selectedTriangle == -1) return;
-    Vec3 faceCenter = computeFaceCenter(vertices[triangles[selectedTriangle].v0], 
-                                         vertices[triangles[selectedTriangle].v1], 
-                                         vertices[triangles[selectedTriangle].v2]);
+    Vec3 faceCenter = computeFaceCenter(mesh.vertices[mesh.triangles[selectedTriangle].v0], 
+                                         mesh.vertices[mesh.triangles[selectedTriangle].v1], 
+                                         mesh.vertices[mesh.triangles[selectedTriangle].v2]);
     glDisable(GL_LIGHTING);
     glColor3f(1.0f, 1.0f, 0.0f); // Rays: Yellow
     glBegin(GL_LINES);
@@ -294,8 +193,8 @@ void ShapeDiameterVis::postSelection(const QPoint& point) {
         float minDist = 1e20f;
         int bestIdx = -1;
         Vec3 p = {(float)selectedPoint.x, (float)selectedPoint.y, (float)selectedPoint.z};
-        for (size_t i = 0; i < triangles.size(); ++i) {
-            Vec3 center = computeFaceCenter(vertices[triangles[i].v0], vertices[triangles[i].v1], vertices[triangles[i].v2]);
+        for (size_t i = 0; i < mesh.triangles.size(); ++i) {
+            Vec3 center = computeFaceCenter(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
             float d = (center.x-p.x)*(center.x-p.x) + (center.y-p.y)*(center.y-p.y) + (center.z-p.z)*(center.z-p.z);
             if (d < minDist) { minDist = d; bestIdx = i; }
         }

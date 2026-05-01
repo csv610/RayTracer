@@ -27,15 +27,14 @@ int main(int argc, char** argv) {
 
     RTCGeometry triangleMesh = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
 
-    std::vector<Vertex> vertices;
-    std::vector<Triangle> triangles;
-    createUVSphere(vertices, triangles, stacks, slices, 1.0f);
+    Mesh mesh;
+    createUVSphere(mesh, stacks, slices, 1.0f);
 
-    Vertex* vertBuffer = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), vertices.size());
-    for (size_t i = 0; i < vertices.size(); ++i) vertBuffer[i] = vertices[i];
+    Vertex* vertBuffer = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) vertBuffer[i] = mesh.vertices[i];
 
-    Triangle* triBuffer = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), triangles.size());
-    for (size_t i = 0; i < triangles.size(); ++i) triBuffer[i] = triangles[i];
+    Triangle* triBuffer = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) triBuffer[i] = mesh.triangles[i];
 
     rtcCommitGeometry(triangleMesh);
     rtcAttachGeometry(scene, triangleMesh);

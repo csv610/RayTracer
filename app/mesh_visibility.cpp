@@ -19,15 +19,14 @@ int main(int argc, char** argv) {
     std::string outputFile = (argc >= 3) ? argv[2] : "mesh_output.off";
 
     printf("Loading mesh: %s\n", inputFile.c_str());
-    std::vector<Vertex> vertices;
-    std::vector<Triangle> triangles;
-    if (!readOFF(inputFile, vertices, triangles)) return 1;
+    Mesh mesh;
+    if (!readOFF(inputFile, mesh)) return 1;
 
-    printf("Mesh: %zu vertices, %zu triangles\n", vertices.size(), triangles.size());
+    printf("Mesh: %zu vertices, %zu triangles\n", mesh.vertices.size(), mesh.triangles.size());
 
     Vertex center;
     float sphereRadius;
-    computeBoundingSphere(vertices, center, sphereRadius);
+    computeBoundingSphere(mesh, center, sphereRadius);
     float outerRadius = sphereRadius * 1.1f;
 
     printf("Bounding sphere: center=(%.3f, %.3f, %.3f), radius=%.3f\n",
@@ -45,11 +44,11 @@ int main(int argc, char** argv) {
 
     RTCGeometry triangleMesh = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
 
-    Vertex* vertBuffer = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), vertices.size());
-    for (size_t i = 0; i < vertices.size(); ++i) vertBuffer[i] = vertices[i];
+    Vertex* vertBuffer = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) vertBuffer[i] = mesh.vertices[i];
 
-    Triangle* triBuffer = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), triangles.size());
-    for (size_t i = 0; i < triangles.size(); ++i) triBuffer[i] = triangles[i];
+    Triangle* triBuffer = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) triBuffer[i] = mesh.triangles[i];
 
     rtcSetGeometryBuildQuality(triangleMesh, RTC_BUILD_QUALITY_HIGH);
     rtcSetGeometryMask(triangleMesh, 0xFFFFFFFF);
@@ -58,7 +57,7 @@ int main(int argc, char** argv) {
     rtcReleaseGeometry(triangleMesh);
     rtcCommitScene(scene);
 
-    std::vector<Vertex> triColors(triangles.size(), {1.0f, 0.0f, 0.0f});
+    std::vector<Vertex> triColors(mesh.triangles.size(), {1.0f, 0.0f, 0.0f});
     int visibleCount = 0;
     int rayHits = 0;
 
@@ -86,11 +85,11 @@ int main(int argc, char** argv) {
     printf("Computing triangle visibility with 2D hemispherical sampling (%d rays per face)...\n", NUM_THETA * NUM_PHI);
     fflush(stdout);
 
-    for (size_t triIdx = 0; triIdx < triangles.size(); ++triIdx) {
-        const Triangle& tri = triangles[triIdx];
-        const Vertex& v0 = vertices[tri.v0];
-        const Vertex& v1 = vertices[tri.v1];
-        const Vertex& v2 = vertices[tri.v2];
+    for (size_t triIdx = 0; triIdx < mesh.triangles.size(); ++triIdx) {
+        const Triangle& tri = mesh.triangles[triIdx];
+        const Vertex& v0 = mesh.vertices[tri.v0];
+        const Vertex& v1 = mesh.vertices[tri.v1];
+        const Vertex& v2 = mesh.vertices[tri.v2];
 
         Vec3 normal = computeFaceNormal(v0, v1, v2);
         Vec3 faceCenter = computeFaceCenter(v0, v1, v2);
@@ -158,25 +157,25 @@ int main(int argc, char** argv) {
 
     FILE* out = fopen(outputFile.c_str(), "w");
     fprintf(out, "OFF\n");
-    fprintf(out, "%zu %zu 0\n", vertices.size(), triangles.size());
-    for (size_t i = 0; i < vertices.size(); ++i) {
-        fprintf(out, "%.6f %.6f %.6f\n", vertices[i].x, vertices[i].y, vertices[i].z);
+    fprintf(out, "%zu %zu 0\n", mesh.vertices.size(), mesh.triangles.size());
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+        fprintf(out, "%.6f %.6f %.6f\n", mesh.vertices[i].x, mesh.vertices[i].y, mesh.vertices[i].z);
     }
-    for (size_t i = 0; i < triangles.size(); ++i) {
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
         fprintf(out, "3 %d %d %d %.6f %.6f %.6f\n", 
-                triangles[i].v0, triangles[i].v1, triangles[i].v2,
+                mesh.triangles[i].v0, mesh.triangles[i].v1, mesh.triangles[i].v2,
                 triColors[i].x, triColors[i].y, triColors[i].z);
     }
     fclose(out);
 
     std::string colorFile = outputFile.substr(0, outputFile.find(".off")) + "_colors.txt";
     FILE* col = fopen(colorFile.c_str(), "w");
-    for (size_t i = 0; i < triangles.size(); ++i) {
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
         fprintf(col, "%.6f %.6f %.6f\n", triColors[i].x, triColors[i].y, triColors[i].z);
     }
     fclose(col);
 
-    printf("Ray hits: %d, Triangle visibility: %d visible (green), %zu occluded (red)\n", rayHits, visibleCount, triangles.size() - visibleCount);
+    printf("Ray hits: %d, Triangle visibility: %d visible (green), %zu occluded (red)\n", rayHits, visibleCount, mesh.triangles.size() - visibleCount);
     printf("Output: %s\n", outputFile.c_str());
     printf("Colors: %s\n", colorFile.c_str());
 
