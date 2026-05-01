@@ -62,6 +62,12 @@ target_link_libraries(undercut_detection PRIVATE embree TBB::tbb assimp::assimp)
 add_executable(overhang_analysis app/overhang_analysis.cpp src/MeshIO.cpp)
 target_link_libraries(overhang_analysis PRIVATE embree TBB::tbb assimp::assimp)
 
+add_executable(accessibility_analysis app/accessibility_analysis.cpp src/MeshIO.cpp)
+target_link_libraries(accessibility_analysis PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(assembly_clearance app/assembly_clearance.cpp src/MeshIO.cpp)
+target_link_libraries(assembly_clearance PRIVATE embree TBB::tbb assimp::assimp)
+
 add_executable(test_symmetry_sphere app/test_symmetry_sphere.cpp src/MeshIO.cpp src/SampleSurface.cpp src/SymmetryDetector.cpp)
 target_link_libraries(test_symmetry_sphere PRIVATE embree TBB::tbb assimp::assimp)
 
