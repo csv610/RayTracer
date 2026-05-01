@@ -18,11 +18,9 @@ int main(int argc, char** argv) {
     auto res = analyzer.analyzeOverhangs(threshold);
 
     std::string outputFile = (argc >= 3) ? argv[2] : "overhangs.off";
-    std::ofstream out(outputFile);
-    out << "OFF\n" << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
-    for (const auto& v : mesh.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
-    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        out << "3 " << mesh.triangles[i].v0 << " " << mesh.triangles[i].v1 << " " << mesh.triangles[i].v2 
+    Mesh coloredMesh = res.getColoredMesh(mesh);
+    MeshIO::save(outputFile, coloredMesh);
+
             << " " << res.colors[i].x << " " << res.colors[i].y << " " << res.colors[i].z << "\n";
     }
     std::cout << "Detected " << res.count << " overhang triangles. Saved to " << outputFile << std::endl;

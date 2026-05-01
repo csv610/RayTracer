@@ -17,12 +17,9 @@ int main(int argc, char** argv) {
 
     AssemblyAnalyzer analyzer(target, env);
     auto colors = analyzer.analyzeVisibility(v);
+    target.faceColors = colors;
+    MeshIO::save(outF, target);
 
-    std::ofstream out(outF);
-    out << "OFF\n" << target.vertices.size() << " " << target.triangles.size() << " 0\n";
-    for (const auto& p : target.vertices) out << p.x << " " << p.y << " " << p.z << "\n";
-    for (size_t i = 0; i < target.triangles.size(); ++i) {
-        out << "3 " << target.triangles[i].v0 << " " << target.triangles[i].v1 << " " << target.triangles[i].v2 
             << " " << colors[i].x << " " << colors[i].y << " " << colors[i].z << "\n";
     }
     std::cout << "Visibility analysis saved to " << outF << std::endl;

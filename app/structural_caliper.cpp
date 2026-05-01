@@ -34,17 +34,13 @@ int main(int argc, char** argv) {
 
     try {
         StructuralCaliper caliper(mesh);
-        auto results = caliper.analyze(numSamples, threshold);
-
-        FILE* out = fopen(outputFile.c_str(), "w");
-        if (!out) { std::cerr << "Failed to open output file" << std::endl; return 1; }
-
-        fprintf(out, "OFF\n%zu 0 0\n", results.size());
+        Mesh outMesh;
         for (const auto& res : results) {
-            fprintf(out, "%f %f %f %f %f %f\n", 
-                res.p.x, res.p.y, res.p.z,
-                res.color.x, res.color.y, res.color.z);
+            outMesh.vertices.push_back({res.p.x, res.p.y, res.p.z});
+            outMesh.vertexColors.push_back(res.color);
         }
+        MeshIO::save(outputFile, outMesh);
+
         fclose(out);
 
         std::cout << "Successfully saved structural analysis to: " << outputFile << std::endl;

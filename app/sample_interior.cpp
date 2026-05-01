@@ -24,13 +24,10 @@ int main(int argc, char** argv) {
     try {
         SampleInterior sampler(mesh);
         std::vector<Vec3> points = sampler.sample(numSamples);
+        Mesh outMesh;
+        for (const auto& p : points) outMesh.vertices.push_back({p.x, p.y, p.z});
+        MeshIO::save(outputFile, outMesh);
 
-        FILE* out = fopen(outputFile.c_str(), "w");
-        fprintf(out, "OFF\n%zu 0 0\n", points.size());
-        for (const auto& p : points) {
-            fprintf(out, "%f %f %f\n", p.x, p.y, p.z);
-        }
-        fclose(out);
 
         std::cout << "Successfully saved " << points.size() << " samples to: " << outputFile << std::endl;
 

@@ -78,14 +78,13 @@ int main(int argc, char** argv) {
             thickness[i] = rh.ray.tfar;
         } else {
             thickness[i] = 0.0f;
-        }
-    });
-
-    float maxT = *std::max_element(thickness.begin(), thickness.end());
-    std::ofstream out(outputFile);
-    out << "OFF" << std::endl;
-    out << mesh.vertices.size() << " " << mesh.triangles.size() << " 0" << std::endl;
+    mesh.vertexColors.resize(mesh.vertices.size());
     for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+        float t = (maxT > 0) ? thickness[i] / maxT : 0;
+        mesh.vertexColors[i] = getJetColor(t);
+    }
+    MeshIO::save(outputFile, mesh);
+
         float t = (maxT > 0) ? thickness[i] / maxT : 0;
         Vec3 c = getJetColor(t);
         out << mesh.vertices[i].x << " " << mesh.vertices[i].y << " " << mesh.vertices[i].z << " " << c.x << " " << c.y << " " << c.z << std::endl;

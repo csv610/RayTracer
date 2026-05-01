@@ -97,35 +97,26 @@ int main(int argc, char** argv) {
         float minS = *std::min_element(combinedScore.begin(), combinedScore.end());
         float maxS = *std::max_element(combinedScore.begin(), combinedScore.end());
 
-        FILE* out = fopen(outputFile.c_str(), "w");
-        fprintf(out, "OFF\n");
-        fprintf(out, "%zu %zu 0\n", mesh.vertices.size(), mesh.triangles.size());
-        for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-            fprintf(out, "%.6f %.6f %.6f\n", mesh.vertices[i].x, mesh.vertices[i].y, mesh.vertices[i].z);
-        }
+        mesh.faceColors.resize(mesh.triangles.size());
         for (size_t i = 0; i < mesh.triangles.size(); ++i) {
             const auto& tri = mesh.triangles[i];
             float avgScore = (combinedScore[tri.v0] + combinedScore[tri.v1] + combinedScore[tri.v2]) / 3.0f;
             float t = (maxS != minS) ? (avgScore - minS) / (maxS - minS) : 0.5f;
-            Vec3 color = getJetColor(t);
-            fprintf(out, "3 %d %d %d %.6f %.6f %.6f\n", tri.v0, tri.v1, tri.v2, color.x, color.y, color.z);
+            mesh.faceColors[i] = getJetColor(t);
         }
-        fclose(out);
+        MeshIO::save(outputFile, mesh);
+
         printf("Output written to %s\n", outputFile.c_str());
 
-        int convexCount = 0, concaveCount = 0, flatCount = 0;
-        for (size_t i = 0; i < combinedScore.size(); ++i) {
-            float t = (maxS != minS) ? (combinedScore[i] - minS) / (maxS - minS) : 0.5f;
-            if (t < 0.33f) concaveCount++;
-            else if (t > 0.66f) convexCount++;
-            else flatCount++;
+        mesh.faceColors.resize(mesh.triangles.size());
+        for (size_t i = 0; i < mesh.triangles.size(); ++i) {
+            const auto& tri = mesh.triangles[i];
+            float avgScore = (combinedScore[tri.v0] + combinedScore[tri.v1] + combinedScore[tri.v2]) / 3.0f;
+            float t = (maxS != minS) ? (avgScore - minS) / (maxS - minS) : 0.5f;
+            mesh.faceColors[i] = getJetColor(t);
         }
-        printf("Region distribution: convex=%d, flat=%d, concave=%d\n", convexCount, flatCount, concaveCount);
+        MeshIO::save(outputFile, mesh);
 
-    } catch (const std::exception& e) {
-        printf("Error: %s\n", e.what());
-        return 1;
-    }
 
     return 0;
 }

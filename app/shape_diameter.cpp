@@ -34,25 +34,14 @@ int main(int argc, char** argv) {
         sd.getStats(minDist, maxDist, avgDist);
         printf("Distance range: [%.4f, %.4f], avg: %.4f\n", minDist, maxDist, avgDist);
 
-        const auto& shapeDiameters = sd.getDiameters();
-
-        FILE* out = fopen(outputFile.c_str(), "w");
-        fprintf(out, "OFF\n");
-        fprintf(out, "%zu %zu 0\n", mesh.vertices.size(), mesh.triangles.size());
-        for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-            fprintf(out, "%.6f %.6f %.6f\n", mesh.vertices[i].x, mesh.vertices[i].y, mesh.vertices[i].z);
-        }
+        mesh.faceColors.resize(mesh.triangles.size());
         for (size_t i = 0; i < mesh.triangles.size(); ++i) {
             float d = shapeDiameters[i];
-            float t = 0;
-            if (maxDist > minDist) {
-                t = (d - minDist) / (maxDist - minDist);
-            }
-            Vec3 color = getJetColor(t);
-            if (d > 1e19f) color = {0, 0, 0}; // Black for no intersection
+            float t = (maxDist > minDist) ? (d - minDist) / (maxDist - minDist) : 0.0f;
+            mesh.faceColors[i] = (d > 1e19f) ? Vec3{0, 0, 0} : getJetColor(t);
+        }
+        MeshIO::save(outputFile, mesh);
 
-            fprintf(out, "3 %d %d %d %.6f %.6f %.6f\n", 
-                    mesh.triangles[i].v0, mesh.triangles[i].v1, mesh.triangles[i].v2,
                     color.x, color.y, color.z);
         }
         fclose(out);

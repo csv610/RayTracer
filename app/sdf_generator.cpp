@@ -113,14 +113,14 @@ int main(int argc, char** argv) {
                 for (int dy = -searchRadius; dy <= searchRadius; ++dy) {
                     for (int dz = -searchRadius; dz <= searchRadius; ++dz) {
                         int nx = bx + dx, ny = by + dy, nz = bz + dz;
-                        if (nx < 0 || nx >= gridRes || ny < 0 || ny >= gridRes || nz < 0 || nz >= gridRes) continue;
-                        for (const auto& s : buckets[nx * gridRes * gridRes + ny * gridRes + nz]) {
-                            float dist2 = (s.x-p.x)*(s.x-p.x) + (s.y-p.y)*(s.y-p.y) + (s.z-p.z)*(s.z-p.z);
-                            if (dist2 < minDistSq) { minDistSq = dist2; found = true; }
-                        }
-                    }
-                }
-            }
+    Mesh outMesh;
+    for (const auto& sp : grid) {
+        outMesh.vertices.push_back({sp.p.x, sp.p.y, sp.p.z});
+        float val = std::clamp((sp.dist / (diag * 0.15f) + 1.0f) * 0.5f, 0.0f, 1.0f);
+        outMesh.vertexColors.push_back(getJetColor(val));
+    }
+    MeshIO::save(outputFile, outMesh);
+
             if (!found) searchRadius++;
         }
 
@@ -129,14 +129,14 @@ int main(int argc, char** argv) {
         grid[idx] = {p, d};
     });
 
-    FILE* out = fopen(outputFile.c_str(), "w");
-    fprintf(out, "OFF\n%d 0 0\n", res * res * res);
+    Mesh outMesh;
     for (const auto& sp : grid) {
+        outMesh.vertices.push_back({sp.p.x, sp.p.y, sp.p.z});
         float val = std::clamp((sp.dist / (diag * 0.15f) + 1.0f) * 0.5f, 0.0f, 1.0f);
-        Vec3 c = getJetColor(val);
-        fprintf(out, "%f %f %f %f %f %f\n", sp.p.x, sp.p.y, sp.p.z, c.x, c.y, c.z);
+        outMesh.vertexColors.push_back(getJetColor(val));
     }
-    fclose(out);
+    MeshIO::save(outputFile, outMesh);
+
 
     std::cout << "SDF grid saved to " << outputFile << std::endl;
     rtcReleaseScene(scene); rtcReleaseDevice(device);

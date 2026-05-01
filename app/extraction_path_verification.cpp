@@ -18,12 +18,8 @@ int main(int argc, char** argv) {
 
     AssemblyAnalyzer analyzer(part, env);
     auto res = analyzer.verifyExtractionPath(d, dist);
+    MeshIO::save(outF, res.getColoredMesh(part));
 
-    std::ofstream out(outF);
-    out << "OFF\n" << part.vertices.size() << " " << part.triangles.size() << " 0\n";
-    for (const auto& v : part.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
-    for (size_t i = 0; i < part.triangles.size(); ++i) {
-        out << "3 " << part.triangles[i].v0 << " " << part.triangles[i].v1 << " " << part.triangles[i].v2 
             << " " << res.colors[i].x << " " << res.colors[i].y << " " << res.colors[i].z << "\n";
     }
     std::cout << "Detected " << res.collisions << " triangles with collisions along path." << std::endl;

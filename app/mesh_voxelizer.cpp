@@ -18,10 +18,8 @@ int main(int argc, char** argv) {
     SimulationSuite suite(mesh);
     auto vres = suite.voxelize(res);
 
-    std::ofstream out(outF);
-    out << "OFF\n" << vres.vertices.size() << " " << vres.triangles.size() << " 0\n";
-    for (const auto& v : vres.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
-    for (const auto& t : vres.triangles) out << "3 " << t.v0 << " " << t.v1 << " " << t.v2 << "\n";
+    MeshIO::save(outF, vres);
+
     std::cout << "Voxelization saved to " << outF << std::endl;
     return 0;
 }

@@ -17,12 +17,11 @@ int main(int argc, char** argv) {
     auto skyView = analyzer.computeSkyViewFactor(samples);
 
     std::string outF = (argc >= 4) ? argv[3] : "sky_view.off";
-    std::ofstream out(outF);
-    out << "OFF\n" << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
-    for (const auto& v : mesh.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
-    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        Vec3 c = getJetColor(skyView[i]);
-        out << "3 " << mesh.triangles[i].v0 << " " << mesh.triangles[i].v1 << " " << mesh.triangles[i].v2 
+    std::string outF = (argc >= 3) ? argv[2] : "sky_view.off";
+    mesh.faceColors.resize(svf.size());
+    for(size_t i=0; i<svf.size(); ++i) mesh.faceColors[i] = {svf[i], svf[i], svf[i]};
+    MeshIO::save(outF, mesh);
+
             << " " << c.x << " " << c.y << " " << c.z << "\n";
     }
     std::cout << "Sky View analysis complete. Saved to " << outF << std::endl;

@@ -136,19 +136,9 @@ int main(int argc, char** argv) {
                 rh.ray.mask = 0xFFFFFFFF;
                 rh.ray.time = 0.0f;
                 rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-
-                RTCIntersectArguments args;
-                rtcInitIntersectArguments(&args);
-                rtcIntersect1(scene, &rh, &args);
-                rayHits++;
-
-                if (rh.hit.geomID == RTC_INVALID_GEOMETRY_ID) {
-                    isVisible = true;
-                    break;
-                }
-            }
-            if (isVisible) break;
-        }
+    mesh.faceColors.resize(triColors.size());
+    for(size_t i=0; i<triColors.size(); ++i) mesh.faceColors[i] = {triColors[i].x, triColors[i].y, triColors[i].z};
+    MeshIO::save(outputFile, mesh);
 
         if (isVisible) {
             visibleCount++;
@@ -156,25 +146,10 @@ int main(int argc, char** argv) {
         }
     }
 
-    FILE* out = fopen(outputFile.c_str(), "w");
-    fprintf(out, "OFF\n");
-    fprintf(out, "%zu %zu 0\n", mesh.vertices.size(), mesh.triangles.size());
-    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-        fprintf(out, "%.6f %.6f %.6f\n", mesh.vertices[i].x, mesh.vertices[i].y, mesh.vertices[i].z);
-    }
-    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        fprintf(out, "3 %d %d %d %.6f %.6f %.6f\n", 
-                mesh.triangles[i].v0, mesh.triangles[i].v1, mesh.triangles[i].v2,
-                triColors[i].x, triColors[i].y, triColors[i].z);
-    }
-    fclose(out);
+    mesh.faceColors.resize(triColors.size());
+    for(size_t i=0; i<triColors.size(); ++i) mesh.faceColors[i] = {triColors[i].x, triColors[i].y, triColors[i].z};
+    MeshIO::save(outputFile, mesh);
 
-    std::string colorFile = outputFile.substr(0, outputFile.find(".off")) + "_colors.txt";
-    FILE* col = fopen(colorFile.c_str(), "w");
-    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        fprintf(col, "%.6f %.6f %.6f\n", triColors[i].x, triColors[i].y, triColors[i].z);
-    }
-    fclose(col);
 
     printf("Ray hits: %d, Triangle visibility: %d visible (green), %zu occluded (red)\n", rayHits, visibleCount, mesh.triangles.size() - visibleCount);
     printf("Output: %s\n", outputFile.c_str());

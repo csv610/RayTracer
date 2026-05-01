@@ -17,12 +17,11 @@ int main(int argc, char** argv) {
     auto ao = analyzer.computeAmbientOcclusion(samples);
 
     std::string outF = (argc >= 3) ? argv[2] : "ao_biked.off";
-    std::ofstream out(outF);
-    out << "OFF\n" << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
-    for (const auto& v : mesh.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
-    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        out << "3 " << mesh.triangles[i].v0 << " " << mesh.triangles[i].v1 << " " << mesh.triangles[i].v2 
-            << " " << ao[i] << " " << ao[i] << " " << ao[i] << "\n";
+    std::string outF = (argc >= 3) ? argv[2] : "ao_biked.off";
+    mesh.faceColors.resize(ao.size());
+    for(size_t i=0; i<ao.size(); ++i) mesh.faceColors[i] = {ao[i], ao[i], ao[i]};
+    MeshIO::save(outF, mesh);
+
     }
     std::cout << "AO baking complete. Saved to " << outF << std::endl;
     return 0;

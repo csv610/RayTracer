@@ -18,13 +18,8 @@ int main(int argc, char** argv) {
 
     SimulationSuite suite(mesh);
     auto cres = suite.simulateCnc(res, toolR);
+    MeshIO::save(outF, cres);
 
-    std::ofstream out(outF);
-    out << "OFF\n" << cres.meshVertices.size() << " " << cres.meshTriangles.size() << " 0\n";
-    for (size_t i = 0; i < cres.meshVertices.size(); ++i) {
-        out << cres.meshVertices[i].x << " " << cres.meshVertices[i].y << " " << cres.meshVertices[i].z 
-            << " " << cres.vertexColors[i].x << " " << cres.vertexColors[i].y << " " << cres.vertexColors[i].z << "\n";
-    }
     for (const auto& t : cres.meshTriangles) out << "3 " << t.v0 << " " << t.v1 << " " << t.v2 << "\n";
     std::cout << "CNC simulation saved to " << outF << std::endl;
     return 0;

@@ -11,7 +11,6 @@
 #include "MeshIO.h"
 
     }
-
     std::string inputFile = argv[1];
     float toolRadius = (argc >= 3) ? (float)atof(argv[2]) : 2.0f; // Default 2mm tool
     std::string outputFile = (argc >= 4) ? argv[3] : "accessibility.off";
@@ -27,14 +26,9 @@
     const auto& triColors = analysis.getTriColors();
 
     // Save as OFF
-    std::ofstream out(outputFile);
-    out << "OFF" << std::endl;
-    out << mesh.vertices.size() << " " << mesh.triangles.size() << " 0" << std::endl;
-    for (const auto& v : mesh.vertices) out << v.x << " " << v.y << " " << v.z << std::endl;
-    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        const auto& t = mesh.triangles[i];
-        const auto& c = triColors[i];
-        out << "3 " << t.v0 << " " << t.v1 << " " << t.v2 << " " << c.x << " " << c.y << " " << c.z << std::endl;
+    mesh.faceColors = triColors;
+    MeshIO::save(outputFile, mesh);
+
     }
 
     std::cout << "Analysis complete: " << analysis.getInaccessibleCount() << " triangles are inaccessible." << std::endl;

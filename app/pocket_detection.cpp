@@ -18,12 +18,11 @@ int main(int argc, char** argv) {
 
     std::string outF = (argc >= 3) ? argv[2] : "pockets.off";
     std::ofstream out(outF);
-    out << "OFF\n" << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
-    for (const auto& v : mesh.vertices) out << v.x << " " << v.y << " " << v.z << "\n";
-    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        // Red for low exposure (pockets), white for high
-        out << "3 " << mesh.triangles[i].v0 << " " << mesh.triangles[i].v1 << " " << mesh.triangles[i].v2 
-            << " 1 " << exposure[i] << " " << exposure[i] << "\n";
+    std::string outF = (argc >= 3) ? argv[2] : "pockets.off";
+    mesh.faceColors.resize(pocket.size());
+    for(size_t i=0; i<pocket.size(); ++i) mesh.faceColors[i] = {pocket[i], pocket[i], pocket[i]};
+    MeshIO::save(outF, mesh);
+
     }
     std::cout << "Pocket analysis complete. Saved to " << outF << std::endl;
     return 0;

@@ -32,18 +32,12 @@ int main(int argc, char** argv) {
         std::vector<SampledPoint> samples = sampler.sample(numSamples, side);
 
         // Save as extended OFF with normals (NOFF)
-        FILE* out = fopen(outputFile.c_str(), "w");
-        if (!out) { std::cerr << "Failed to open output file" << std::endl; return 1; }
-        
-        fprintf(out, "NOFF\n%zu 0 0\n", samples.size());
+        Mesh outMesh;
         for (const auto& s : samples) {
-            fprintf(out, "%f %f %f %f %f %f\n", 
-                s.p.x, s.p.y, s.p.z,
-                s.n.x, s.n.y, s.n.z);
+            outMesh.vertices.push_back({s.p.x, s.p.y, s.p.z});
+            outMesh.vertexNormals.push_back(s.n);
         }
-        fclose(out);
-
-        std::cout << "Successfully saved " << samples.size() << " samples with normals to: " << outputFile << std::endl;
+        MeshIO::save(outputFile, outMesh);
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
