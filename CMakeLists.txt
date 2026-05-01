@@ -56,6 +56,12 @@ target_link_libraries(symmetry_detection PRIVATE embree TBB::tbb assimp::assimp)
 add_executable(pocket_detection app/pocket_detection.cpp src/MeshIO.cpp)
 target_link_libraries(pocket_detection PRIVATE embree TBB::tbb assimp::assimp)
 
+add_executable(undercut_detection app/undercut_detection.cpp src/MeshIO.cpp)
+target_link_libraries(undercut_detection PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(overhang_analysis app/overhang_analysis.cpp src/MeshIO.cpp)
+target_link_libraries(overhang_analysis PRIVATE embree TBB::tbb assimp::assimp)
+
 add_executable(test_symmetry_sphere app/test_symmetry_sphere.cpp src/MeshIO.cpp src/SampleSurface.cpp src/SymmetryDetector.cpp)
 target_link_libraries(test_symmetry_sphere PRIVATE embree TBB::tbb assimp::assimp)
 
