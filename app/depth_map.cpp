@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include "mesh_utils.h"
+#include "MeshIO.h"
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -15,7 +16,7 @@ int main(int argc, char** argv) {
     std::string outputFile = (argc >= 3) ? argv[2] : "depth.ppm";
 
     Mesh mesh;
-    if (!readOFF(inputFile, mesh)) {
+    if (!MeshIO::load(inputFile, mesh)) {
         std::cerr << "Failed to load mesh: " << inputFile << std::endl;
         return 1;
     }

@@ -17,30 +17,10 @@ struct Mesh {
 };
 
 inline bool readOFF(const std::string& filename, Mesh& mesh) {
-    std::ifstream file(filename);
-    if (!file.is_open()) return false;
-
-    std::string header;
-    file >> header;
-    if (header != "OFF" && header != "off") return false;
-
-    int nVerts, nTris, nEdges;
-    if (!(file >> nVerts >> nTris >> nEdges)) return false;
-
-    mesh.vertices.resize(nVerts);
-    for (int i = 0; i < nVerts; ++i) {
-        if (!(file >> mesh.vertices[i].x >> mesh.vertices[i].y >> mesh.vertices[i].z)) return false;
-    }
-
-    mesh.triangles.resize(nTris);
-    for (int i = 0; i < nTris; ++i) {
-        int n;
-        if (!(file >> n >> mesh.triangles[i].v0 >> mesh.triangles[i].v1 >> mesh.triangles[i].v2)) return false;
-    }
-
-    file.close();
-    return true;
+    // Deprecated: use MeshIO::load
+    return false;
 }
+
 
 inline Vec3 computeFaceNormal(const Vertex& v0, const Vertex& v1, const Vertex& v2) {
     Vec3 e1 = {v1.x - v0.x, v1.y - v0.y, v1.z - v0.z};

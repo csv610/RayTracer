@@ -1,7 +1,3 @@
-#include <tbb/parallel_for.h>
-#include <QApplication>
-#include <QGLViewer/qglviewer.h>
-#include <QKeyEvent>
 #include <embree4/rtcore.h>
 #include <vector>
 #include <iostream>
@@ -9,11 +5,13 @@
 #include <memory>
 #include <execution>
 #include <numeric>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 #include "mesh_utils.h"
+#include "MeshIO.h"
 #include "ShapeDiameter.h"
+
+#include <QApplication>
+#include <QGLViewer/qglviewer.h>
+#include <QKeyEvent>
 
 class ShapeDiameterVis : public QGLViewer {
 public:
@@ -55,17 +53,9 @@ private:
 };
 
 void ShapeDiameterVis::loadMesh() {
-    Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(inputFile, aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
-    if (!scene || !scene->mRootNode) { std::cerr << "Assimp error: " << importer.GetErrorString() << std::endl; exit(1); }
-    for (unsigned int i = 0; i < scene->mNumMeshes; ++i) {
-        aiMesh* aiM = scene->mMeshes[i];
-        unsigned int offset = mesh.vertices.size();
-        for (unsigned int j = 0; j < aiM->mNumVertices; ++j) mesh.vertices.push_back({aiM->mVertices[j].x, aiM->mVertices[j].y, aiM->mVertices[j].z});
-        for (unsigned int j = 0; j < aiM->mNumFaces; ++j) {
-            aiFace face = aiM->mFaces[j];
-            if (face.mNumIndices == 3) mesh.triangles.push_back({face.mIndices[0] + offset, face.mIndices[1] + offset, face.mIndices[2] + offset});
-        }
+    if (!MeshIO::load(inputFile, mesh)) {
+        std::cerr << "Failed to load mesh: " << inputFile << std::endl;
+        exit(1);
     }
 }
 

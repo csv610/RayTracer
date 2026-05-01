@@ -1,7 +1,3 @@
-#include <tbb/parallel_for.h>
-#include <QApplication>
-#include <QGLViewer/qglviewer.h>
-#include <QKeyEvent>
 #include <embree4/rtcore.h>
 #include <iostream>
 #include <vector>
@@ -10,11 +6,13 @@
 #include <cmath>
 #include <memory>
 #include <numeric>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 #include "mesh_utils.h"
+#include "MeshIO.h"
 #include "ShapeDiameter.h"
+
+#include <QApplication>
+#include <QGLViewer/qglviewer.h>
+#include <QKeyEvent>
 
 struct AABB {
     Vec3 min = {1e20f, 1e20f, 1e20f};
@@ -68,21 +66,14 @@ private:
 };
 
 void DepthMapVis::loadMesh() {
-    Assimp::Importer importer;
-    const aiScene* aiS = importer.ReadFile(inputFile, aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
-    if (!aiS || !aiS->mRootNode) { std::cerr << "Assimp error: " << importer.GetErrorString() << std::endl; exit(1); }
-    for (unsigned int i = 0; i < aiS->mNumMeshes; ++i) {
-        aiMesh* m = aiS->mMeshes[i];
-        unsigned int offset = mesh.vertices.size();
-        for (unsigned int j = 0; j < m->mNumVertices; ++j) {
-            Vertex v = {m->mVertices[j].x, m->mVertices[j].y, m->mVertices[j].z};
-            mesh.vertices.push_back(v); box.expand(v);
-        }
-        for (unsigned int j = 0; j < m->mNumFaces; ++j) {
-            if (m->mFaces[j].mNumIndices == 3)
-                mesh.triangles.push_back({m->mFaces[j].mIndices[0] + offset, m->mFaces[j].mIndices[1] + offset, m->mFaces[j].mIndices[2] + offset});
-        }
+    if (!MeshIO::load(inputFile, mesh)) {
+        std::cerr << "Failed to load mesh: " << inputFile << std::endl;
+        exit(1);
     }
+    for (const auto& v : mesh.vertices) box.expand(v);
+
+    std::cout << "Loaded mesh: " << mesh.vertices.size() << " vertices, " << mesh.triangles.size() << " triangles" << std::endl;
+    std::cout << "Bounding Box: [" << box.min.x << ", " << box.min.y << ", " << box.min.z << "] - [" << box.max.x << ", " << box.max.y << ", " << box.max.z << "]" << std::endl;
 }
 
 void DepthMapVis::setupVBOs() {

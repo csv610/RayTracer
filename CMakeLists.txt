@@ -14,28 +14,29 @@ find_package(TBB REQUIRED)
 include_directories(src)
 
 # Existing targets
-add_executable(meshvis app/mesh_visibility.cpp)
-target_link_libraries(meshvis PRIVATE embree TBB::tbb)
+add_executable(meshvis app/mesh_visibility.cpp src/MeshIO.cpp)
+target_link_libraries(meshvis PRIVATE embree TBB::tbb assimp::assimp)
 
-add_executable(sphere_benchmark app/sphere_benchmark.cpp)
-target_link_libraries(sphere_benchmark PRIVATE embree TBB::tbb)
+add_executable(sphere_benchmark app/sphere_benchmark.cpp src/MeshIO.cpp)
+target_link_libraries(sphere_benchmark PRIVATE embree TBB::tbb assimp::assimp)
 
-add_executable(shape_diameter app/shape_diameter.cpp)
-target_link_libraries(shape_diameter PRIVATE embree TBB::tbb)
+add_executable(shape_diameter app/shape_diameter.cpp src/MeshIO.cpp)
+target_link_libraries(shape_diameter PRIVATE embree TBB::tbb assimp::assimp)
 
-add_executable(raytracer app/raytracer.cpp)
-target_link_libraries(raytracer PRIVATE embree TBB::tbb)
+add_executable(raytracer app/raytracer.cpp src/MeshIO.cpp)
+target_link_libraries(raytracer PRIVATE embree TBB::tbb assimp::assimp)
 
-add_executable(shadow_plane app/shadow_plane.cpp)
-target_link_libraries(shadow_plane PRIVATE embree TBB::tbb)
+add_executable(shadow_plane app/shadow_plane.cpp src/MeshIO.cpp)
+target_link_libraries(shadow_plane PRIVATE embree TBB::tbb assimp::assimp)
 
-add_executable(depth_map app/depth_map.cpp)
-target_link_libraries(depth_map PRIVATE embree TBB::tbb)
+add_executable(depth_map app/depth_map.cpp src/MeshIO.cpp)
+target_link_libraries(depth_map PRIVATE embree TBB::tbb assimp::assimp)
 
-add_executable(test_mesh_utils src/test_mesh_utils.cpp)
+add_executable(test_mesh_utils src/test_mesh_utils.cpp src/MeshIO.cpp)
+target_link_libraries(test_mesh_utils PRIVATE assimp::assimp)
 
 # New Visualization Target
-add_executable(shape_diameter_vis app/ShapeDiameterVis.cpp)
+add_executable(shape_diameter_vis app/ShapeDiameterVis.cpp src/MeshIO.cpp)
 target_include_directories(shape_diameter_vis PRIVATE /Users/csv610/Projects/Mesh/libQGLViewer)
 target_link_libraries(shape_diameter_vis PRIVATE 
     embree 
@@ -49,7 +50,7 @@ target_link_libraries(shape_diameter_vis PRIVATE
 )
 
 # Depth Map Viewer Target
-add_executable(depth_map_viewer app/depth_map_viewer.cpp)
+add_executable(depth_map_viewer app/depth_map_viewer.cpp src/MeshIO.cpp)
 target_include_directories(depth_map_viewer PRIVATE /Users/csv610/Projects/Mesh/libQGLViewer)
 target_link_libraries(depth_map_viewer PRIVATE 
     embree 

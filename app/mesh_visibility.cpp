@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <fstream>
 #include "mesh_utils.h"
+#include "MeshIO.h"
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -20,7 +21,7 @@ int main(int argc, char** argv) {
 
     printf("Loading mesh: %s\n", inputFile.c_str());
     Mesh mesh;
-    if (!readOFF(inputFile, mesh)) return 1;
+    if (!MeshIO::load(inputFile, mesh)) return 1;
 
     printf("Mesh: %zu vertices, %zu triangles\n", mesh.vertices.size(), mesh.triangles.size());
 
