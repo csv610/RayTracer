@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <stdexcept>
 #include <cmath>
+#include <tbb/parallel_for.h>
+#include <numeric>
 #include "mesh_utils.h"
 
 class ShapeDiameter {
@@ -19,38 +21,30 @@ public:
 
     ShapeDiameter(const Mesh& mesh) : mesh(mesh) {
         device = rtcNewDevice(nullptr);
-        if (device == nullptr) {
-            throw std::runtime_error("Failed to create Embree device");
-        }
-        rtcSetDeviceErrorFunction(device, [](void* userPtr, RTCError code, const char* msg) {
-            printf("Embree error %d: %s\n", code, msg);
-        }, nullptr);
+        if (device == nullptr) throw std::runtime_error("Failed to create Embree device");
         scene = rtcNewScene(device);
         buildScene();
     }
 
     ~ShapeDiameter() {
-        rtcReleaseScene(scene);
-        rtcReleaseDevice(device);
+        if (scene) rtcReleaseScene(scene);
+        if (device) rtcReleaseDevice(device);
     }
 
     void compute(int numTheta = 4, int numPhi = 8, float coneAngle = 0.5f) {
-        shapeDiameters.assign(mesh.triangles.size(), 1e20f);
-        
-        printf("Computing shape diameter with %d inward rays per face...\n", numTheta * numPhi);
-        fflush(stdout);
+        int numTris = (int)mesh.triangles.size();
+        shapeDiameters.assign(numTris, 1e20f);
 
-        for (size_t triIdx = 0; triIdx < mesh.triangles.size(); ++triIdx) {
+        tbb::parallel_for(0, numTris, [&](int triIdx) {
             std::vector<RayHit> hits;
             computeForFace(triIdx, hits, numTheta, numPhi, coneAngle);
-            
             if (!hits.empty()) {
                 std::vector<float> distances;
                 for (const auto& h : hits) distances.push_back(h.distance);
                 std::sort(distances.begin(), distances.end());
                 shapeDiameters[triIdx] = distances[distances.size() / 2];
             }
-        }
+        });
     }
 
     void computeForFace(int triIdx, std::vector<RayHit>& hits, int numTheta = 4, int numPhi = 8, float coneAngle = 0.5f) const {
@@ -79,46 +73,36 @@ public:
                 float phi = 2.0f * M_PI * (j + 0.5f) / numPhi;
                 float sinT = sin(theta); float cosT = cos(theta);
                 float sinP = sin(phi);   float cosP = cos(phi);
-
                 Vec3 rayDir = {
                     (tangent.x * cosP + bitangent.x * sinP) * sinT + inwardNormal.x * cosT,
                     (tangent.y * cosP + bitangent.y * sinP) * sinT + inwardNormal.y * cosT,
                     (tangent.z * cosP + bitangent.z * sinP) * sinT + inwardNormal.z * cosT
                 };
-
                 RTCRayHit rh;
                 float epsilon = 0.0001f;
                 rh.ray.org_x = faceCenter.x + inwardNormal.x * epsilon;
                 rh.ray.org_y = faceCenter.y + inwardNormal.y * epsilon;
                 rh.ray.org_z = faceCenter.z + inwardNormal.z * epsilon;
                 rh.ray.dir_x = rayDir.x; rh.ray.dir_y = rayDir.y; rh.ray.dir_z = rayDir.z;
-                rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = 0xFFFFFFFF;
-                rh.ray.time = 0.0f; rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-
-                RTCIntersectArguments args;
-                rtcInitIntersectArguments(&args);
+                rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = -1; rh.ray.time = 0; rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+                RTCIntersectArguments args; rtcInitIntersectArguments(&args);
                 rtcIntersect1(scene, &rh, &args);
-
-                if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-                    hits.push_back({(int)rh.hit.primID, rayDir, rh.ray.tfar});
-                }
+                if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) hits.push_back({(int)rh.hit.primID, rayDir, rh.ray.tfar});
             }
         }
     }
 
     const std::vector<float>& getDiameters() const { return shapeDiameters; }
+    RTCScene getScene() const { return scene; }
 
     void getStats(float& minD, float& maxD, float& avgD) const {
-        maxD = 0;
-        minD = 1e20f;
-        float sumDist = 0;
-        int count = 0;
+        maxD = 0; minD = 1e20f;
+        float sumDist = 0; int count = 0;
         for (float d : shapeDiameters) {
             if (d < 1e19f) {
                 if (d > maxD) maxD = d;
                 if (d < minD) minD = d;
-                sumDist += d;
-                count++;
+                sumDist += d; count++;
             }
         }
         avgD = count > 0 ? sumDist / count : 0;
@@ -127,19 +111,15 @@ public:
 private:
     const Mesh& mesh;
     std::vector<float> shapeDiameters;
-    RTCDevice device;
-    RTCScene scene;
+    RTCDevice device = nullptr;
+    RTCScene scene = nullptr;
 
     void buildScene() {
         RTCGeometry triangleMesh = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-
-        Vertex* vertBuffer = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-        for (size_t i = 0; i < mesh.vertices.size(); ++i) vertBuffer[i] = mesh.vertices[i];
-
-        Triangle* triBuffer = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-        for (size_t i = 0; i < mesh.triangles.size(); ++i) triBuffer[i] = mesh.triangles[i];
-
-        rtcSetGeometryBuildQuality(triangleMesh, RTC_BUILD_QUALITY_HIGH);
+        Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
+        memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
+        Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
+        memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
         rtcCommitGeometry(triangleMesh);
         rtcAttachGeometry(scene, triangleMesh);
         rtcReleaseGeometry(triangleMesh);

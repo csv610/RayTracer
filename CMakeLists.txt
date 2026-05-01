@@ -1,39 +1,36 @@
 cmake_minimum_required(VERSION 3.16)
 project(EmbreeTest)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find Embree
+# Find Dependencies
 find_package(Embree 4 REQUIRED)
-
-# Find Qt6
 find_package(Qt6 COMPONENTS Widgets Xml OpenGLWidgets REQUIRED)
 find_package(OpenGL REQUIRED)
-
-# Find Assimp
 find_package(assimp REQUIRED)
+find_package(TBB REQUIRED)
 
 include_directories(src)
 
 # Existing targets
 add_executable(meshvis app/mesh_visibility.cpp)
-target_link_libraries(meshvis PRIVATE embree)
+target_link_libraries(meshvis PRIVATE embree TBB::tbb)
 
 add_executable(sphere_benchmark app/sphere_benchmark.cpp)
-target_link_libraries(sphere_benchmark PRIVATE embree)
+target_link_libraries(sphere_benchmark PRIVATE embree TBB::tbb)
 
 add_executable(shape_diameter app/shape_diameter.cpp)
-target_link_libraries(shape_diameter PRIVATE embree)
+target_link_libraries(shape_diameter PRIVATE embree TBB::tbb)
 
 add_executable(raytracer app/raytracer.cpp)
-target_link_libraries(raytracer PRIVATE embree)
+target_link_libraries(raytracer PRIVATE embree TBB::tbb)
 
 add_executable(shadow_plane app/shadow_plane.cpp)
-target_link_libraries(shadow_plane PRIVATE embree)
+target_link_libraries(shadow_plane PRIVATE embree TBB::tbb)
 
 add_executable(depth_map app/depth_map.cpp)
-target_link_libraries(depth_map PRIVATE embree)
+target_link_libraries(depth_map PRIVATE embree TBB::tbb)
 
 add_executable(test_mesh_utils src/test_mesh_utils.cpp)
 
@@ -47,6 +44,7 @@ target_link_libraries(shape_diameter_vis PRIVATE
     Qt6::OpenGLWidgets 
     OpenGL::GL
     assimp::assimp
+    TBB::tbb
     /Users/csv610/Projects/Mesh/libQGLViewer/QGLViewer/libQGLViewer.dylib
 )
 
@@ -60,6 +58,7 @@ target_link_libraries(depth_map_viewer PRIVATE
     Qt6::Xml 
     Qt6::OpenGLWidgets 
     OpenGL::GL
+    TBB::tbb
     /Users/csv610/Projects/Mesh/libQGLViewer/QGLViewer/libQGLViewer.dylib
 )
 

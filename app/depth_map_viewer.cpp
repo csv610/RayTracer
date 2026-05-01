@@ -1,3 +1,4 @@
+#include <tbb/parallel_for.h>
 #include <QApplication>
 #include <QGLViewer/qglviewer.h>
 #include <QKeyEvent>
@@ -7,10 +8,13 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
+#include <memory>
+#include <numeric>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include "mesh_utils.h"
+#include "ShapeDiameter.h"
 
 struct AABB {
     Vec3 min = {1e20f, 1e20f, 1e20f};
@@ -24,7 +28,15 @@ struct AABB {
 
 class DepthMapVis : public QGLViewer {
 public:
-    DepthMapVis(const std::string& filename) : inputFile(filename) {}
+    DepthMapVis(const std::string& filename) : inputFile(filename) {
+        for(int i=0; i<6; ++i) textures[i] = 0;
+    }
+    ~DepthMapVis() {
+        glDeleteTextures(6, textures);
+        if (vbo_vertices) glDeleteBuffers(1, &vbo_vertices);
+        if (vbo_indices) glDeleteBuffers(1, &vbo_indices);
+        if (vbo_normals) glDeleteBuffers(1, &vbo_normals);
+    }
 
 protected:
     virtual void draw() override;
@@ -35,35 +47,36 @@ private:
     std::string inputFile;
     Mesh mesh;
     AABB box;
-    RTCDevice device = nullptr;
-    RTCScene scene = nullptr;
-    
-    GLuint textures[6]; // Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
+    std::unique_ptr<ShapeDiameter> sd;
+    GLuint textures[6];
     int res = 512;
     bool showBox = true;
+    bool showWireframe = false;
+    bool showLighting = true;
+    bool showSmoothShading = true;
+
+    GLuint vbo_vertices = 0;
+    GLuint vbo_indices = 0;
+    GLuint vbo_normals = 0;
 
     void loadMesh();
-    void buildEmbreeScene();
     void computeDepthMaps();
     void createTexture(int idx, const std::vector<unsigned char>& data);
     void drawBoxPlanes();
     void drawMesh();
+    void setupVBOs();
 };
 
 void DepthMapVis::loadMesh() {
     Assimp::Importer importer;
     const aiScene* aiS = importer.ReadFile(inputFile, aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
-    if (!aiS || !aiS->mRootNode) {
-        std::cerr << "Assimp error: " << importer.GetErrorString() << std::endl;
-        exit(1);
-    }
+    if (!aiS || !aiS->mRootNode) { std::cerr << "Assimp error: " << importer.GetErrorString() << std::endl; exit(1); }
     for (unsigned int i = 0; i < aiS->mNumMeshes; ++i) {
         aiMesh* m = aiS->mMeshes[i];
         unsigned int offset = mesh.vertices.size();
         for (unsigned int j = 0; j < m->mNumVertices; ++j) {
             Vertex v = {m->mVertices[j].x, m->mVertices[j].y, m->mVertices[j].z};
-            mesh.vertices.push_back(v);
-            box.expand(v);
+            mesh.vertices.push_back(v); box.expand(v);
         }
         for (unsigned int j = 0; j < m->mNumFaces; ++j) {
             if (m->mFaces[j].mNumIndices == 3)
@@ -72,21 +85,39 @@ void DepthMapVis::loadMesh() {
     }
 }
 
-void DepthMapVis::buildEmbreeScene() {
-    device = rtcNewDevice(nullptr);
-    scene = rtcNewScene(device);
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene);
+void DepthMapVis::setupVBOs() {
+    if(vbo_vertices) glDeleteBuffers(1, &vbo_vertices);
+    if(vbo_indices) glDeleteBuffers(1, &vbo_indices);
+    if(vbo_normals) glDeleteBuffers(1, &vbo_normals);
+
+    glGenBuffers(1, &vbo_vertices);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(Vertex), mesh.vertices.data(), GL_STATIC_DRAW);
+
+    // Compute Vertex Normals for smooth shading
+    std::vector<Vec3> normals(mesh.vertices.size(), {0, 0, 0});
+    for (const auto& t : mesh.triangles) {
+        Vec3 n = computeFaceNormal(mesh.vertices[t.v0], mesh.vertices[t.v1], mesh.vertices[t.v2]);
+        normals[t.v0].x += n.x; normals[t.v0].y += n.y; normals[t.v0].z += n.z;
+        normals[t.v1].x += n.x; normals[t.v1].y += n.y; normals[t.v1].z += n.z;
+        normals[t.v2].x += n.x; normals[t.v2].y += n.y; normals[t.v2].z += n.z;
+    }
+    for (auto& n : normals) {
+        float len = sqrt(n.x*n.x + n.y*n.y + n.z*n.z);
+        if (len > 0) { n.x /= len; n.y /= len; n.z /= len; }
+    }
+
+    glGenBuffers(1, &vbo_normals);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_normals);
+    glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(Vec3), normals.data(), GL_STATIC_DRAW);
+
+    glGenBuffers(1, &vbo_indices);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_indices);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.triangles.size() * sizeof(Triangle), mesh.triangles.data(), GL_STATIC_DRAW);
 }
 
 void DepthMapVis::createTexture(int idx, const std::vector<unsigned char>& data) {
+    if (textures[idx]) glDeleteTextures(1, &textures[idx]);
     glGenTextures(1, &textures[idx]);
     glBindTexture(GL_TEXTURE_2D, textures[idx]);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, res, res, 0, GL_RGB, GL_UNSIGNED_BYTE, data.data());
@@ -97,172 +128,104 @@ void DepthMapVis::createTexture(int idx, const std::vector<unsigned char>& data)
 void DepthMapVis::computeDepthMaps() {
     Vec3 size = box.size();
     for (int side_idx = 0; side_idx < 6; ++side_idx) {
-        int axis = side_idx / 2;
-        int side = side_idx % 2;
-        
+        int axis = side_idx / 2; int side = side_idx % 2;
         float u_size, v_size, w_size;
         Vec3 org, dir;
-        if (axis == 0) { // X
-            u_size = size.z; v_size = size.y; w_size = size.x;
-            dir = (side == 0) ? Vec3{1, 0, 0} : Vec3{-1, 0, 0};
-            org.x = (side == 0) ? box.min.x : box.max.x;
-        } else if (axis == 1) { // Y
-            u_size = size.x; v_size = size.z; w_size = size.y;
-            dir = (side == 0) ? Vec3{0, 1, 0} : Vec3{0, -1, 0};
-            org.y = (side == 0) ? box.min.y : box.max.y;
-        } else { // Z
-            u_size = size.x; v_size = size.y; w_size = size.z;
-            dir = (side == 0) ? Vec3{0, 0, 1} : Vec3{0, 0, -1};
-            org.z = (side == 0) ? box.min.z : box.max.z;
-        }
+        if (axis == 0) { u_size = size.z; v_size = size.y; w_size = size.x; dir = (side == 0) ? Vec3{1, 0, 0} : Vec3{-1, 0, 0}; org.x = (side == 0) ? box.min.x : box.max.x; }
+        else if (axis == 1) { u_size = size.x; v_size = size.z; w_size = size.y; dir = (side == 0) ? Vec3{0, 1, 0} : Vec3{0, -1, 0}; org.y = (side == 0) ? box.min.y : box.max.y; }
+        else { u_size = size.x; v_size = size.y; w_size = size.z; dir = (side == 0) ? Vec3{0, 0, 1} : Vec3{0, 0, -1}; org.z = (side == 0) ? box.min.z : box.max.z; }
 
         std::vector<unsigned char> data(res * res * 3);
-        for (int iv = 0; iv < res; ++iv) {
-            for (int iu = 0; iu < res; ++iu) {
-                float u = (iu + 0.5f) / res;
-                float v = (iv + 0.5f) / res;
-                RTCRayHit rh;
-                if (axis == 0) {
-                    rh.ray.org_x = org.x; rh.ray.org_y = box.min.y + v * v_size; rh.ray.org_z = box.min.z + u * u_size;
-                } else if (axis == 1) {
-                    rh.ray.org_x = box.min.x + u * u_size; rh.ray.org_y = org.y; rh.ray.org_z = box.min.z + v * v_size;
-                } else {
-                    rh.ray.org_x = box.min.x + u * u_size; rh.ray.org_y = box.min.y + v * v_size; rh.ray.org_z = org.z;
-                }
-                rh.ray.dir_x = dir.x; rh.ray.dir_y = dir.y; rh.ray.dir_z = dir.z;
-                rh.ray.tnear = 0.0f; rh.ray.tfar = w_size * 1.1f;
-                rh.ray.mask = -1; rh.ray.time = 0; rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-                RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-                rtcIntersect1(scene, &rh, &args);
-
-                Vec3 color = {0, 0, 0};
-                if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-                    float val = rh.ray.tfar / (w_size + 1e-6f);
-                    color = getJetColor(1.0f - val);
-                }
-                int base = (iv * res + iu) * 3;
-                data[base + 0] = (unsigned char)(color.x * 255);
-                data[base + 1] = (unsigned char)(color.y * 255);
-                data[base + 2] = (unsigned char)(color.z * 255);
-            }
-        }
+        tbb::parallel_for(0, res * res, [&](int p) {
+            int iu = p % res; int iv = p / res;
+            float u = (iu + 0.5f) / res; float v = (iv + 0.5f) / res;
+            RTCRayHit rh;
+            if (axis == 0) { rh.ray.org_x = org.x; rh.ray.org_y = box.min.y + v * v_size; rh.ray.org_z = box.min.z + u * u_size; }
+            else if (axis == 1) { rh.ray.org_x = box.min.x + u * u_size; rh.ray.org_y = org.y; rh.ray.org_z = box.min.z + v * v_size; }
+            else { rh.ray.org_x = box.min.x + u * u_size; rh.ray.org_y = box.min.y + v * v_size; rh.ray.org_z = org.z; }
+            rh.ray.dir_x = dir.x; rh.ray.dir_y = dir.y; rh.ray.dir_z = dir.z;
+            rh.ray.tnear = 0.0f; rh.ray.tfar = w_size * 1.1f;
+            rh.ray.mask = -1; rh.ray.time = 0; rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+            RTCIntersectArguments args; rtcInitIntersectArguments(&args);
+            rtcIntersect1(sd->getScene(), &rh, &args);
+            Vec3 color = {0, 0, 0};
+            if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) color = getJetColor(1.0f - (rh.ray.tfar / (w_size + 1e-6f)));
+            data[p * 3 + 0] = (unsigned char)(color.x * 255);
+            data[p * 3 + 1] = (unsigned char)(color.y * 255);
+            data[p * 3 + 2] = (unsigned char)(color.z * 255);
+        });
         createTexture(side_idx, data);
     }
 }
 
 void DepthMapVis::init() {
     loadMesh();
-    buildEmbreeScene();
-    computeDepthMaps();
-    
+    sd = std::make_unique<ShapeDiameter>(mesh);
+    computeDepthMaps(); setupVBOs();
     Vec3 c = {(box.min.x + box.max.x)/2.0f, (box.min.y + box.max.y)/2.0f, (box.min.z + box.max.z)/2.0f};
-    float r = sqrtf(powf(box.max.x-box.min.x, 2) + powf(box.max.y-box.min.y, 2) + powf(box.max.z-box.min.z, 2))/2.0f;
     setSceneCenter(qglviewer::Vec(c.x, c.y, c.z));
-    setSceneRadius(r);
-    showEntireScene();
-    
-    glEnable(GL_DEPTH_TEST);
+    setSceneRadius(sqrtf(powf(box.max.x-box.min.x, 2) + powf(box.max.y-box.min.y, 2) + powf(box.max.z-box.min.z, 2))/2.0f);
+    showEntireScene(); glEnable(GL_DEPTH_TEST);
 }
 
 void DepthMapVis::drawMesh() {
-    glEnable(GL_LIGHTING);
+    if (showLighting) glEnable(GL_LIGHTING); else glDisable(GL_LIGHTING);
+    glShadeModel(showSmoothShading ? GL_SMOOTH : GL_FLAT);
+    
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
     glColor3f(0.8f, 0.8f, 0.8f);
-    glBegin(GL_TRIANGLES);
-    for (const auto& t : mesh.triangles) {
-        const auto& v0 = mesh.vertices[t.v0]; const auto& v1 = mesh.vertices[t.v1]; const auto& v2 = mesh.vertices[t.v2];
-        Vec3 n = computeFaceNormal(v0, v1, v2);
-        glNormal3f(n.x, n.y, n.z);
-        glVertex3f(v0.x, v0.y, v0.z); glVertex3f(v1.x, v1.y, v1.z); glVertex3f(v2.x, v2.y, v2.z);
+    if (showWireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    
+    glEnableClientState(GL_VERTEX_ARRAY);
+    if (showSmoothShading) {
+        glEnableClientState(GL_NORMAL_ARRAY);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_normals);
+        glNormalPointer(GL_FLOAT, sizeof(Vec3), 0);
     }
-    glEnd();
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices); glVertexPointer(3, GL_FLOAT, sizeof(Vertex), 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_indices); glDrawElements(GL_TRIANGLES, mesh.triangles.size() * 3, GL_UNSIGNED_INT, 0);
+    
+    if (showSmoothShading) glDisableClientState(GL_NORMAL_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Restore for textures
+    glDisable(GL_CULL_FACE);
 }
 
 void DepthMapVis::drawBoxPlanes() {
-    glDisable(GL_LIGHTING);
-    glEnable(GL_TEXTURE_2D);
-    glColor3f(1.0f, 1.0f, 1.0f);
-    
-    // Xmin plane
-    glBindTexture(GL_TEXTURE_2D, textures[0]);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z);
-    glTexCoord2f(1,0); glVertex3f(box.min.x, box.min.y, box.max.z);
-    glTexCoord2f(1,1); glVertex3f(box.min.x, box.max.y, box.max.z);
-    glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.min.z);
-    glEnd();
-    
-    // Xmax plane
-    glBindTexture(GL_TEXTURE_2D, textures[1]);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0,0); glVertex3f(box.max.x, box.min.y, box.min.z);
-    glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.max.z);
-    glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.max.z);
-    glTexCoord2f(0,1); glVertex3f(box.max.x, box.max.y, box.min.z);
-    glEnd();
-
-    // Ymin plane
-    glBindTexture(GL_TEXTURE_2D, textures[2]);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z);
-    glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.min.z);
-    glTexCoord2f(1,1); glVertex3f(box.max.x, box.min.y, box.max.z);
-    glTexCoord2f(0,1); glVertex3f(box.min.x, box.min.y, box.max.z);
-    glEnd();
-    
-    // Ymax plane
-    glBindTexture(GL_TEXTURE_2D, textures[3]);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0,0); glVertex3f(box.min.x, box.max.y, box.min.z);
-    glTexCoord2f(1,0); glVertex3f(box.max.x, box.max.y, box.min.z);
-    glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.max.z);
-    glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.max.z);
-    glEnd();
-
-    // Zmin plane
-    glBindTexture(GL_TEXTURE_2D, textures[4]);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z);
-    glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.min.z);
-    glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.min.z);
-    glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.min.z);
-    glEnd();
-    
-    // Zmax plane
-    glBindTexture(GL_TEXTURE_2D, textures[5]);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.max.z);
-    glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.max.z);
-    glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.max.z);
-    glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.max.z);
-    glEnd();
-
+    glDisable(GL_LIGHTING); glEnable(GL_TEXTURE_2D); glColor3f(1, 1, 1);
+    glBindTexture(GL_TEXTURE_2D, textures[0]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.min.x, box.min.y, box.max.z); glTexCoord2f(1,1); glVertex3f(box.min.x, box.max.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.min.z); glEnd();
+    glBindTexture(GL_TEXTURE_2D, textures[1]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.max.x, box.min.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.max.z); glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.max.x, box.max.y, box.min.z); glEnd();
+    glBindTexture(GL_TEXTURE_2D, textures[2]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.min.z); glTexCoord2f(1,1); glVertex3f(box.max.x, box.min.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.min.x, box.min.y, box.max.z); glEnd();
+    glBindTexture(GL_TEXTURE_2D, textures[3]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.min.x, box.max.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.max.x, box.max.y, box.min.z); glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.max.z); glEnd();
+    glBindTexture(GL_TEXTURE_2D, textures[4]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.min.z); glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.min.z); glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.min.z); glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.min.z); glEnd();
+    glBindTexture(GL_TEXTURE_2D, textures[5]); glBegin(GL_QUADS); glTexCoord2f(0,0); glVertex3f(box.min.x, box.min.y, box.max.z); glTexCoord2f(1,0); glVertex3f(box.max.x, box.min.y, box.max.z); glTexCoord2f(1,1); glVertex3f(box.max.x, box.max.y, box.max.z); glTexCoord2f(0,1); glVertex3f(box.min.x, box.max.y, box.max.z); glEnd();
     glDisable(GL_TEXTURE_2D);
 }
 
 void DepthMapVis::draw() {
     drawMesh();
-    
-    if (showBox) {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
-        drawBoxPlanes();
+    if (showBox) { 
+        glEnable(GL_BLEND); 
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        drawBoxPlanes(); 
     }
 }
 
 void DepthMapVis::keyPressEvent(QKeyEvent* e) {
     if (e->key() == Qt::Key_Escape) exit(0);
-    else if (e->key() == Qt::Key_B) {
-        showBox = !showBox;
-        update();
-    }
+    else if (e->key() == Qt::Key_B) { showBox = !showBox; update(); }
+    else if (e->key() == Qt::Key_W) { showWireframe = !showWireframe; update(); }
+    else if (e->key() == Qt::Key_L) { showLighting = !showLighting; update(); }
+    else if (e->key() == Qt::Key_S) { showSmoothShading = !showSmoothShading; update(); }
     else QGLViewer::keyPressEvent(e);
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <model_file>" << std::endl;
-        return 1;
-    }
+    if (argc < 2) { std::cerr << "Usage: " << argv[0] << " <model_file>" << std::endl; return 1; }
     QApplication app(argc, argv);
     DepthMapVis viewer(argv[1]);
     viewer.setWindowTitle("Bounding Box Depth Maps");
