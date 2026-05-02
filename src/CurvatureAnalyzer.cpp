@@ -5,6 +5,7 @@
 #include <cmath>
 #include <set>
 #include <stdexcept>
+#include <algorithm>
 
 CurvatureAnalyzer::CurvatureAnalyzer(const Mesh& m) : mesh(m) {
     buildScene();
@@ -241,4 +242,68 @@ float CurvatureAnalyzer::computePocketDepth(unsigned int vidx, float avgEdgeLen)
     }
 
     return maxDist;
+}
+
+CurvatureAnalyzer::Result CurvatureAnalyzer::analyze(float alpha, float beta, float gamma) {
+    auto dist = [](const Vertex& a, const Vertex& b) {
+        float dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+        return sqrt(dx*dx + dy*dy + dz*dz);
+    };
+    float avgEdgeLen = 0.0f;
+    for (const auto& tri : mesh.triangles) {
+        avgEdgeLen += dist(mesh.vertices[tri.v0], mesh.vertices[tri.v1]) + 
+                      dist(mesh.vertices[tri.v1], mesh.vertices[tri.v2]) + 
+                      dist(mesh.vertices[tri.v0], mesh.vertices[tri.v2]);
+    }
+    avgEdgeLen /= (mesh.triangles.size() * 3);
+
+    Result res;
+    size_t nv = mesh.vertices.size();
+    res.gaussianCurv.resize(nv);
+    res.meanCurv.resize(nv);
+    res.concavity.resize(nv);
+    res.pocketDepth.resize(nv);
+    res.combinedScore.resize(nv);
+
+    tbb::parallel_for(size_t(0), nv, [&](size_t i) {
+        res.gaussianCurv[i] = computeGaussianCurvature((unsigned int)i);
+        res.meanCurv[i] = computeMeanCurvature((unsigned int)i);
+        res.concavity[i] = computeConcavity((unsigned int)i, avgEdgeLen);
+        res.pocketDepth[i] = computePocketDepth((unsigned int)i, avgEdgeLen);
+    });
+
+    float minG = *std::min_element(res.gaussianCurv.begin(), res.gaussianCurv.end());
+    float maxG = *std::max_element(res.gaussianCurv.begin(), res.gaussianCurv.end());
+    float minM = *std::min_element(res.meanCurv.begin(), res.meanCurv.end());
+    float maxM = *std::max_element(res.meanCurv.begin(), res.meanCurv.end());
+    float minC = *std::min_element(res.concavity.begin(), res.concavity.end());
+    float maxC = *std::max_element(res.concavity.begin(), res.concavity.end());
+    float minP = *std::min_element(res.pocketDepth.begin(), res.pocketDepth.end());
+    float maxP = *std::max_element(res.pocketDepth.begin(), res.pocketDepth.end());
+
+    for (size_t i = 0; i < nv; ++i) {
+        float gNorm = (maxG != minG) ? (res.gaussianCurv[i] - minG) / (maxG - minG) : 0.5f;
+        float mNorm = (maxM != minM) ? (res.meanCurv[i] - minM) / (maxM - minM) : 0.5f;
+        float cNorm = (maxC != minC) ? (res.concavity[i] - minC) / (maxC - minC) : 0.5f;
+        float pNorm = (maxP != minP) ? (res.pocketDepth[i] - minP) / (maxP - minP) : 0.5f;
+        res.combinedScore[i] = alpha * (gNorm + mNorm) * 0.5f + beta * cNorm + gamma * pNorm;
+    }
+
+    return res;
+}
+
+Mesh CurvatureAnalyzer::Result::getColoredMesh(const Mesh& original) const {
+    Mesh mesh = original;
+    mesh.faceColors.resize(mesh.triangles.size());
+    
+    float minS = *std::min_element(combinedScore.begin(), combinedScore.end());
+    float maxS = *std::max_element(combinedScore.begin(), combinedScore.end());
+
+    for (size_t i = 0; i < mesh.triangles.size(); ++i) {
+        const auto& tri = mesh.triangles[i];
+        float avgScore = (combinedScore[tri.v0] + combinedScore[tri.v1] + combinedScore[tri.v2]) / 3.0f;
+        float t = (maxS != minS) ? (avgScore - minS) / (maxS - minS) : 0.5f;
+        mesh.faceColors[i] = getJetColor(t);
+    }
+    return mesh;
 }
