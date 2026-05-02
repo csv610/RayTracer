@@ -1,4 +1,3 @@
-#include <embree4/rtcore.h>
 #include <vector>
 #include <iostream>
 #include <algorithm>

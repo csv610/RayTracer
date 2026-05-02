@@ -3,9 +3,13 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-#include <cstring>
 #include <algorithm>
-#include "mesh_utils.h"
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <mesh.off> [output.ppm]" << std::endl;
+        return 1;
+    }
 
     std::string inputFile = argv[1];
     std::string outputFile = (argc >= 3) ? argv[2] : "shadow.ppm";
@@ -13,11 +17,6 @@
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;
 
-    RTCDevice device = rtcNewDevice(nullptr);
-    RTCScene scene = rtcNewScene(device);
-
-    // Mesh
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
     Scene scene;
     scene.addMesh(mesh);
 
@@ -38,7 +37,6 @@
     scene.addMesh(plane);
     scene.commit();
 
-
     const int width = 800, height = 600;
     std::vector<Vec3> image(width * height);
     Vec3 lightDir = {0.5f, 0.5f, 1.0f};
@@ -48,16 +46,6 @@
     Vec3 center = {(bbox.min.x + bbox.max.x) * 0.5f, (bbox.min.y + bbox.max.y) * 0.5f, (bbox.min.z + bbox.max.z) * 0.5f};
 
     for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            RTCRayHit rh;
-            rh.ray.org_x = center.x; rh.ray.org_y = center.y; rh.ray.org_z = center.z + diag * 2.0f;
-            rh.ray.dir_x = (x / (float)width - 0.5f) * 1.5f;
-            rh.ray.dir_y = (0.5f - y / (float)height) * 1.5f;
-            rh.ray.dir_z = -1.0f;
-            rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = -1;
-            rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-            RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-            rtcIntersect1(scene, &rh, &args);
         for (int x = 0; x < width; ++x) {
             Ray ray;
             ray.org = {center.x, center.y, center.z + diag * 2.0f};
@@ -74,12 +62,13 @@
                 float shadow = RayTracer::occluded(scene, sray) ? 0.3f : 1.0f;
                 float dot = std::max(0.2f, (hit.normal.x * lightDir.x + hit.normal.y * lightDir.y + hit.normal.z * lightDir.z));
                 image[y * width + x] = {dot * shadow, dot * shadow, dot * shadow};
-
+            } else {
+                image[y * width + x] = {0.1f, 0.1f, 0.2f};
+            }
+        }
     }
 
     MeshIO::savePPM(outputFile, width, height, image);
     std::cout << "Saved to " << outputFile << std::endl;
-
-    rtcReleaseScene(scene); rtcReleaseDevice(device);
     return 0;
 }

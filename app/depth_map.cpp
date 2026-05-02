@@ -3,10 +3,12 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-#include <cstring>
 #include <algorithm>
-#include "mesh_utils.h"
+#include <string>
 
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <mesh.off> [output.ppm]" << std::endl;
         return 1;
     }
 
@@ -16,12 +18,11 @@
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;
 
-    RTCDevice device = rtcNewDevice(nullptr);
-    RTCScene scene = rtcNewScene(device);
     Scene scene;
     scene.addMesh(mesh);
     scene.commit();
 
+    const int width = 800, height = 600;
     std::vector<Vec3> image(width * height);
     AABB bbox;
     for (const auto& v : mesh.vertices) bbox.expand(v);
@@ -33,15 +34,6 @@
 
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-            RTCRayHit rh;
-            rh.ray.org_x = center.x; rh.ray.org_y = center.y; rh.ray.org_z = center.z + diag * 1.5f;
-            rh.ray.dir_x = (x / (float)width - 0.5f) * 1.2f;
-            rh.ray.dir_y = (0.5f - y / (float)height) * 1.2f;
-            rh.ray.dir_z = -1.0f;
-            rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = -1;
-            rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-            RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-        for (int x = 0; x < width; ++x) {
             Ray ray;
             ray.org = {center.x, center.y, center.z + diag * 1.5f};
             ray.dir = {(x / (float)width - 0.5f) * 1.2f, (0.5f - y / (float)height) * 1.2f, -1.0f};
@@ -52,7 +44,11 @@
                 maxDepth = std::max(maxDepth, hit.t);
             }
         }
+    }
 
+    for (int i = 0; i < width * height; ++i) {
+        if (depths[i] >= 0) {
+            float t = (maxDepth > minDepth) ? 1.0f - (depths[i] - minDepth) / (maxDepth - minDepth) : 1.0f;
             image[i] = {t, t, t};
         } else {
             image[i] = {0, 0, 0};
@@ -61,7 +57,5 @@
 
     MeshIO::savePPM(outputFile, width, height, image);
     std::cout << "Depth map saved to " << outputFile << std::endl;
-
-    rtcReleaseScene(scene); rtcReleaseDevice(device);
     return 0;
 }

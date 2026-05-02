@@ -1,39 +1,22 @@
 #include "CurvatureAnalyzer.h"
-#include <embree4/rtcore.h>
+#include "MeshIO.h"
 #include <cmath>
 #include <cstdio>
-#include <cstdlib>
 #include <vector>
 #include <string>
 #include <algorithm>
-#include <unordered_map>
-#include <set>
-#include <limits>
-#include <cstring>
-#include "mesh_utils.h"
-#include "MeshIO.h"
-
-inline Vec3 vertexToVec3(const Vertex& v) {
-    return {v.x, v.y, v.z};
-}
-
 
 int main(int argc, char** argv) {
     if (argc < 2) {
         printf("Usage: %s <mesh.off> [output.off]\n", argv[0]);
-        printf("Analyzes surface curvature and detects concave/convex regions.\n");
-        printf("Output: convex regions (red/orange), concave regions (blue/cyan)\n");
         return 1;
     }
 
     std::string inputFile = argv[1];
     std::string outputFile = (argc >= 3) ? argv[2] : "curvature_output.off";
 
-    printf("Loading mesh: %s\n", inputFile.c_str());
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;
-
-    printf("Mesh: %zu vertices, %zu triangles\n", mesh.vertices.size(), mesh.triangles.size());
 
     try {
         CurvatureAnalyzer analyzer(mesh);
@@ -44,15 +27,12 @@ int main(int argc, char** argv) {
         };
         float avgEdgeLen = 0.0f;
         for (const auto& tri : mesh.triangles) {
-            const Vertex& v0 = mesh.vertices[tri.v0];
-            const Vertex& v1 = mesh.vertices[tri.v1];
-            const Vertex& v2 = mesh.vertices[tri.v2];
-            avgEdgeLen += dist(v0, v1) + dist(v1, v2) + dist(v0, v2);
+            avgEdgeLen += dist(mesh.vertices[tri.v0], mesh.vertices[tri.v1]) + 
+                          dist(mesh.vertices[tri.v1], mesh.vertices[tri.v2]) + 
+                          dist(mesh.vertices[tri.v0], mesh.vertices[tri.v2]);
         }
         avgEdgeLen /= (mesh.triangles.size() * 3);
-        printf("Average edge length: %.4f\n", avgEdgeLen);
 
-        printf("Computing curvatures...\n");
         std::vector<float> gaussianCurv(mesh.vertices.size());
         std::vector<float> meanCurv(mesh.vertices.size());
         std::vector<float> concavity(mesh.vertices.size());
@@ -74,24 +54,14 @@ int main(int argc, char** argv) {
         float minP = *std::min_element(pocketDepth.begin(), pocketDepth.end());
         float maxP = *std::max_element(pocketDepth.begin(), pocketDepth.end());
 
-        printf("Gaussian curvature range: [%.4f, %.4f]\n", minG, maxG);
-        printf("Mean curvature range: [%.4f, %.4f]\n", minM, maxM);
-        printf("Concavity range: [%.4f, %.4f]\n", minC, maxC);
-        printf("Pocket depth range: [%.4f, %.4f]\n", minP, maxP);
-
-        float alpha = 0.4f;
-        float beta = 0.3f;
-        float gamma = 0.3f;
-
+        float alpha = 0.4f, beta = 0.3f, gamma = 0.3f;
         std::vector<float> combinedScore(mesh.vertices.size());
         for (size_t i = 0; i < mesh.vertices.size(); ++i) {
             float gNorm = (maxG != minG) ? (gaussianCurv[i] - minG) / (maxG - minG) : 0.5f;
             float mNorm = (maxM != minM) ? (meanCurv[i] - minM) / (maxM - minM) : 0.5f;
             float cNorm = (maxC != minC) ? (concavity[i] - minC) / (maxC - minC) : 0.5f;
             float pNorm = (maxP != minP) ? (pocketDepth[i] - minP) / (maxP - minP) : 0.5f;
-
-            float curvScore = (gNorm + mNorm) * 0.5f;
-            combinedScore[i] = alpha * curvScore + beta * cNorm + gamma * pNorm;
+            combinedScore[i] = alpha * (gNorm + mNorm) * 0.5f + beta * cNorm + gamma * pNorm;
         }
 
         float minS = *std::min_element(combinedScore.begin(), combinedScore.end());
@@ -105,18 +75,11 @@ int main(int argc, char** argv) {
             mesh.faceColors[i] = getJetColor(t);
         }
         MeshIO::save(outputFile, mesh);
+        printf("Curvature analysis saved to %s\n", outputFile.c_str());
 
-        printf("Output written to %s\n", outputFile.c_str());
-
-        mesh.faceColors.resize(mesh.triangles.size());
-        for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-            const auto& tri = mesh.triangles[i];
-            float avgScore = (combinedScore[tri.v0] + combinedScore[tri.v1] + combinedScore[tri.v2]) / 3.0f;
-            float t = (maxS != minS) ? (avgScore - minS) / (maxS - minS) : 0.5f;
-            mesh.faceColors[i] = getJetColor(t);
-        }
-        MeshIO::save(outputFile, mesh);
-
-
+    } catch (const std::exception& e) {
+        printf("Error: %s\n", e.what());
+        return 1;
+    }
     return 0;
 }
