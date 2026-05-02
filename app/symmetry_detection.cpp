@@ -10,50 +10,30 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::string inputFile = argv[1];
     Mesh mesh;
-    if (!MeshIO::load(inputFile, mesh)) {
-        std::cerr << "Failed to load mesh: " << inputFile << std::endl;
-        return 1;
-    }
-
-    std::cout << "Mesh loaded: " << mesh.vertices.size() << " vertices, " << mesh.triangles.size() << " triangles." << std::endl;
+    if (!MeshIO::load(argv[1], mesh)) return 1;
 
     SymmetryDetector detector(mesh);
-    std::cout << "Finding candidate symmetry planes..." << std::endl;
-    std::vector<Plane> candidates = detector.findCandidatePlanes();
+    auto res = detector.detectSymmetry();
 
     std::cout << std::fixed << std::setprecision(6);
-    std::cout << "\nCandidate Planes (based on Principal Component Analysis):" << std::endl;
-    std::cout << "---------------------------------------------------------" << std::endl;
-    
-    float bestScore = 1e10f;
-    Plane bestPlane;
-
-    for (size_t i = 0; i < candidates.size(); ++i) {
-        const auto& p = candidates[i];
-        std::cout << "Plane " << i << ": Normal(" << p.normal.x << ", " << p.normal.y << ", " << p.normal.z << "), Dist: " << p.distance << std::endl;
-        
-        float score = detector.checkSymmetry(p);
-        std::cout << "  Symmetry Score: " << score << " (lower is better)" << std::endl;
-
-        if (score < bestScore) {
-            bestScore = score;
-            bestPlane = p;
-        }
+    std::cout << "\nCandidate Symmetry Planes:" << std::endl;
+    for (size_t i = 0; i < res.candidates.size(); ++i) {
+        const auto& c = res.candidates[i];
+        std::cout << "Plane " << i << ": Normal(" << c.first.normal.x << ", " << c.first.normal.y << ", " << c.first.normal.z 
+                  << "), Score: " << c.second << std::endl;
     }
 
     std::cout << "\nBest symmetry plane found:" << std::endl;
-    std::cout << "Normal: (" << bestPlane.normal.x << ", " << bestPlane.normal.y << ", " << bestPlane.normal.z << ")" << std::endl;
-    std::cout << "Distance: " << bestPlane.distance << std::endl;
-    std::cout << "Score: " << bestScore << std::endl;
+    std::cout << "Normal: (" << res.bestPlane.normal.x << ", " << res.bestPlane.normal.y << ", " << res.bestPlane.normal.z << ")" << std::endl;
+    std::cout << "Score: " << res.bestScore << std::endl;
 
-    if (bestScore < 0.005) {
-        std::cout << "Result: The mesh exhibits STRONG symmetry with respect to this plane." << std::endl;
-    } else if (bestScore < 0.02) {
-        std::cout << "Result: The mesh exhibits MODERATE symmetry with respect to this plane." << std::endl;
+    if (res.quality == SymmetryDetector::Quality::STRONG) {
+        std::cout << "Result: The mesh exhibits STRONG symmetry." << std::endl;
+    } else if (res.quality == SymmetryDetector::Quality::MODERATE) {
+        std::cout << "Result: The mesh exhibits MODERATE symmetry." << std::endl;
     } else {
-        std::cout << "Result: No strong global symmetry detected among principal axes." << std::endl;
+        std::cout << "Result: No strong global symmetry detected." << std::endl;
     }
 
     return 0;

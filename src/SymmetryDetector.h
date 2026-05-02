@@ -2,9 +2,9 @@
 #define SYMMETRY_DETECTOR_H
 
 #include "mesh_utils.h"
+#include "RayTracer.h"
 #include "SampleSurface.h"
 #include <vector>
-#include <embree4/rtcore.h>
 
 struct Plane {
     Vec3 normal;
@@ -23,6 +23,15 @@ struct Plane {
 
 class SymmetryDetector {
 public:
+    enum class Quality { NONE, MODERATE, STRONG };
+
+    struct Result {
+        Plane bestPlane;
+        float bestScore;
+        Quality quality;
+        std::vector<std::pair<Plane, float>> candidates;
+    };
+
     SymmetryDetector(const Mesh& mesh);
     ~SymmetryDetector();
 
@@ -32,10 +41,12 @@ public:
     // Finds candidate planes based on principal axes
     std::vector<Plane> findCandidatePlanes() const;
 
+    // High-level detection
+    Result detectSymmetry() const;
+
 private:
     const Mesh& mesh;
-    RTCDevice device;
-    RTCScene scene;
+    Scene scene;
     float meshDiagonal;
     std::vector<SampledPoint> preSampledPoints;
 

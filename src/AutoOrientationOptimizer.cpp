@@ -7,27 +7,16 @@
 #include <cmath>
 
 AutoOrientationOptimizer::AutoOrientationOptimizer(const Mesh& mesh) : mesh(mesh) {
-    device = rtcNewDevice(nullptr);
-    scene = rtcNewScene(device);
     buildScene();
     AABB bbox; for(const auto& v : mesh.vertices) bbox.expand(v);
     meshDiag = bbox.size().length();
 }
 
-AutoOrientationOptimizer::~AutoOrientationOptimizer() {
-    rtcReleaseScene(scene);
-    rtcReleaseDevice(device);
-}
+AutoOrientationOptimizer::~AutoOrientationOptimizer() {}
 
 void AutoOrientationOptimizer::buildScene() {
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcCommitScene(scene);
+    scene.addSharedMesh(mesh);
+    scene.commit();
 }
 
 float AutoOrientationOptimizer::calculateSupportVolume(Vec3 upDir) const {
@@ -38,11 +27,14 @@ float AutoOrientationOptimizer::calculateSupportVolume(Vec3 upDir) const {
             Vec3 n = computeFaceNormal(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
             if (n.x*upDir.x + n.y*upDir.y + n.z*upDir.z < criticalCos) {
                 Vec3 center = computeFaceCenter(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
-                RTCRayHit rh; rh.ray.org_x=center.x-n.x*epsilon; rh.ray.org_y=center.y-n.y*epsilon; rh.ray.org_z=center.z-n.z*epsilon;
-                rh.ray.dir_x=-upDir.x; rh.ray.dir_y=-upDir.y; rh.ray.dir_z=-upDir.z;
-                rh.ray.tnear=0; rh.ray.tfar=meshDiag*2; rh.ray.mask=-1; rh.hit.geomID=RTC_INVALID_GEOMETRY_ID;
-                RTCIntersectArguments args; rtcInitIntersectArguments(&args); rtcIntersect1(scene, &rh, &args);
-                float dist = (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) ? rh.ray.tfar : meshDiag;
+                Ray ray;
+                ray.org = {center.x - n.x * epsilon, center.y - n.y * epsilon, center.z - n.z * epsilon};
+                ray.dir = {-upDir.x, -upDir.y, -upDir.z};
+                ray.tnear = 0.0f;
+                ray.tfar = meshDiag * 2.0f;
+
+                Hit hit = RayTracer::intersect(scene, ray);
+                float dist = hit.hit ? hit.t : meshDiag;
                 init += (double)dist * computeFaceArea(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
             }
         }

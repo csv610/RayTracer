@@ -2,7 +2,7 @@
 #define AUTO_ORIENTATION_OPTIMIZER_H
 
 #include "mesh_utils.h"
-#include <embree4/rtcore.h>
+#include "RayTracer.h"
 #include <vector>
 
 class AutoOrientationOptimizer {
@@ -19,8 +19,7 @@ public:
 
 private:
     const Mesh& mesh;
-    RTCDevice device;
-    RTCScene scene;
+    Scene scene;
     float meshDiag;
 
     void buildScene();

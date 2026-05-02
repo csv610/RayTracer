@@ -7,33 +7,20 @@
 #include <cmath>
 
 SymmetryDetector::SymmetryDetector(const Mesh& mesh) : mesh(mesh) {
-    device = rtcNewDevice(nullptr);
-    scene = rtcNewScene(device);
     buildScene();
 
     AABB bbox;
     for (const auto& v : mesh.vertices) bbox.expand(v);
-    Vec3 size = bbox.size();
-    meshDiagonal = sqrt(size.x*size.x + size.y*size.y + size.z*size.z);
+    meshDiagonal = bbox.size().length();
     
     preSample(10000);
 }
 
-SymmetryDetector::~SymmetryDetector() {
-    if (scene) rtcReleaseScene(scene);
-    if (device) rtcReleaseDevice(device);
-}
+SymmetryDetector::~SymmetryDetector() {}
 
 void SymmetryDetector::buildScene() {
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene);
+    scene.addSharedMesh(mesh);
+    scene.commit();
 }
 
 void SymmetryDetector::preSample(int numSamples) {
@@ -54,40 +41,23 @@ float SymmetryDetector::checkSymmetry(const Plane& plane) const {
                 Vec3 p_ref = plane.reflectPoint(sp.p);
                 Vec3 n_ref = plane.reflectVector(sp.n);
 
-                RTCRayHit rh;
-                rh.ray.org_x = p_ref.x + n_ref.x * epsilon;
-                rh.ray.org_y = p_ref.y + n_ref.y * epsilon;
-                rh.ray.org_z = p_ref.z + n_ref.z * epsilon;
-                rh.ray.dir_x = -n_ref.x;
-                rh.ray.dir_y = -n_ref.y;
-                rh.ray.dir_z = -n_ref.z;
-                rh.ray.tnear = 0.0f;
-                rh.ray.tfar = epsilon * 10.0f;
-                rh.ray.mask = -1;
-                rh.ray.time = 0;
-                rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+                Ray ray;
+                ray.org = {p_ref.x + n_ref.x * epsilon, p_ref.y + n_ref.y * epsilon, p_ref.z + n_ref.z * epsilon};
+                ray.dir = {-n_ref.x, -n_ref.y, -n_ref.z};
+                ray.tnear = 0.0f;
+                ray.tfar = epsilon * 10.0f;
 
-                RTCIntersectArguments args;
-                rtcInitIntersectArguments(&args);
-                rtcIntersect1(scene, &rh, &args);
+                Hit hit = RayTracer::intersect(scene, ray);
 
-                if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-                    float dist = std::abs(rh.ray.tfar - epsilon);
-                    localError += dist;
+                if (hit.hit) {
+                    localError += std::abs(hit.t - epsilon);
                 } else {
-                    rh.ray.org_x = p_ref.x - n_ref.x * epsilon;
-                    rh.ray.org_y = p_ref.y - n_ref.y * epsilon;
-                    rh.ray.org_z = p_ref.z - n_ref.z * epsilon;
-                    rh.ray.dir_x = n_ref.x;
-                    rh.ray.dir_y = n_ref.y;
-                    rh.ray.dir_z = n_ref.z;
-                    rh.ray.tfar = epsilon * 10.0f;
-                    rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-                    rtcIntersect1(scene, &rh, &args);
+                    ray.org = {p_ref.x - n_ref.x * epsilon, p_ref.y - n_ref.y * epsilon, p_ref.z - n_ref.z * epsilon};
+                    ray.dir = {n_ref.x, n_ref.y, n_ref.z};
+                    hit = RayTracer::intersect(scene, ray);
                     
-                    if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-                        float dist = std::abs(rh.ray.tfar - epsilon);
-                        localError += dist;
+                    if (hit.hit) {
+                        localError += std::abs(hit.t - epsilon);
                     } else {
                         localError += epsilon * 10.0f;
                     }
@@ -148,7 +118,7 @@ void eigenSolveSymmetric3x3(float m[3][3], float eigenvalues[3], Vec3 eigenvecto
         else if (l23 > l31) v = n23;
         else v = n31;
         
-        float norm = sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+        float norm = v.length();
         if (norm > 0) { v.x /= norm; v.y /= norm; v.z /= norm; }
         else {
             if (k==0) v = {1,0,0};
@@ -190,4 +160,26 @@ std::vector<Plane> SymmetryDetector::findCandidatePlanes() const {
         planes.push_back(p);
     }
     return planes;
+}
+
+SymmetryDetector::Result SymmetryDetector::detectSymmetry() const {
+    std::vector<Plane> candidates = findCandidatePlanes();
+    Result result;
+    result.bestScore = 1e10f;
+    result.quality = Quality::NONE;
+
+    for (const auto& p : candidates) {
+        float score = checkSymmetry(p);
+        result.candidates.push_back({p, score});
+        if (score < result.bestScore) {
+            result.bestScore = score;
+            result.bestPlane = p;
+        }
+    }
+
+    if (result.bestScore < 0.005f) result.quality = Quality::STRONG;
+    else if (result.bestScore < 0.02f) result.quality = Quality::MODERATE;
+    else result.quality = Quality::NONE;
+
+    return result;
 }
