@@ -1,7 +1,8 @@
 #include "GeometryAnalyzer.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
+#include <vector>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -17,13 +18,10 @@ int main(int argc, char** argv) {
     auto exposure = analyzer.computePocketExposure(samples);
 
     std::string outF = (argc >= 3) ? argv[2] : "pockets.off";
-    std::ofstream out(outF);
-    std::string outF = (argc >= 3) ? argv[2] : "pockets.off";
-    mesh.faceColors.resize(pocket.size());
-    for(size_t i=0; i<pocket.size(); ++i) mesh.faceColors[i] = {pocket[i], pocket[i], pocket[i]};
+    mesh.faceColors.resize(exposure.size());
+    for(size_t i = 0; i < exposure.size(); ++i) mesh.faceColors[i] = {exposure[i], exposure[i], exposure[i]};
+    
     MeshIO::save(outF, mesh);
-
-    }
     std::cout << "Pocket analysis complete. Saved to " << outF << std::endl;
     return 0;
 }

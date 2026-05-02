@@ -1,7 +1,8 @@
 #include "ManufacturingAnalyzer.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
+#include <cmath>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -15,8 +16,8 @@ int main(int argc, char** argv) {
     Vec3 pullDir = {0, 0, 1};
     if (argc >= 6) {
         pullDir = {(float)atof(argv[3]), (float)atof(argv[4]), (float)atof(argv[5])};
-        float l = sqrt(pullDir.x*pullDir.x + pullDir.y*pullDir.y + pullDir.z*pullDir.z);
-        if(l>0) { pullDir.x/=l; pullDir.y/=l; pullDir.z/=l; }
+        float l = pullDir.length();
+        if(l > 0) { pullDir.x /= l; pullDir.y /= l; pullDir.z /= l; }
     }
 
     ManufacturingAnalyzer analyzer(mesh);
@@ -26,8 +27,6 @@ int main(int argc, char** argv) {
     Mesh coloredMesh = res.getColoredMesh(mesh);
     MeshIO::save(outputFile, coloredMesh);
 
-            << " " << res.colors[i].x << " " << res.colors[i].y << " " << res.colors[i].z << "\n";
-    }
     std::cout << "Detected " << res.count << " undercut triangles. Saved to " << outputFile << std::endl;
 
     return 0;

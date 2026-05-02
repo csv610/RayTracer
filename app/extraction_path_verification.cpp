@@ -1,7 +1,7 @@
 #include "AssemblyAnalyzer.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
 
 int main(int argc, char** argv) {
     if (argc < 6) {
@@ -20,8 +20,6 @@ int main(int argc, char** argv) {
     auto res = analyzer.verifyExtractionPath(d, dist);
     MeshIO::save(outF, res.getColoredMesh(part));
 
-            << " " << res.colors[i].x << " " << res.colors[i].y << " " << res.colors[i].z << "\n";
-    }
     std::cout << "Detected " << res.collisions << " triangles with collisions along path." << std::endl;
 
     return 0;

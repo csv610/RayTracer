@@ -1,7 +1,7 @@
 #include "AssemblyAnalyzer.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
 
 int main(int argc, char** argv) {
     if (argc < 3) {
@@ -20,7 +20,6 @@ int main(int argc, char** argv) {
 
     MeshIO::save(outputFile, res.getColoredMesh(meshA));
 
-    }
     std::cout << "Analysis complete: " << res.collisions << " collisions, " << res.violations << " clearance violations." << std::endl;
 
     return 0;

@@ -1,7 +1,7 @@
 #include "ManufacturingAnalyzer.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -16,17 +16,17 @@ int main(int argc, char** argv) {
     int outIdx = 2;
     if (argc >= 5) {
         pullDir = {(float)atof(argv[2]), (float)atof(argv[3]), (float)atof(argv[4])};
+        float l = pullDir.length();
+        if(l > 0) { pullDir.x /= l; pullDir.y /= l; pullDir.z /= l; }
         outIdx = 5;
     }
     std::string outputFile = (argc > outIdx) ? argv[outIdx] : "draft_angles.off";
 
     ManufacturingAnalyzer analyzer(mesh);
+    auto res = analyzer.analyzeDraftAngles(pullDir);
     Mesh coloredMesh = res.getColoredMesh(mesh);
     MeshIO::save(outputFile, coloredMesh);
 
-        out << "3 " << mesh.triangles[i].v0 << " " << mesh.triangles[i].v1 << " " << mesh.triangles[i].v2 
-            << " " << res.colors[i].x << " " << res.colors[i].y << " " << res.colors[i].z << "\n";
-    }
     std::cout << "Draft angle analysis saved to " << outputFile << std::endl;
 
     return 0;

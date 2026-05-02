@@ -1,7 +1,8 @@
 #include "GeometryAnalyzer.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
+#include <vector>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -17,13 +18,10 @@ int main(int argc, char** argv) {
     auto skyView = analyzer.computeSkyViewFactor(samples);
 
     std::string outF = (argc >= 4) ? argv[3] : "sky_view.off";
-    std::string outF = (argc >= 3) ? argv[2] : "sky_view.off";
-    mesh.faceColors.resize(svf.size());
-    for(size_t i=0; i<svf.size(); ++i) mesh.faceColors[i] = {svf[i], svf[i], svf[i]};
+    mesh.faceColors.resize(skyView.size());
+    for(size_t i = 0; i < skyView.size(); ++i) mesh.faceColors[i] = {skyView[i], skyView[i], skyView[i]};
+    
     MeshIO::save(outF, mesh);
-
-            << " " << c.x << " " << c.y << " " << c.z << "\n";
-    }
     std::cout << "Sky View analysis complete. Saved to " << outF << std::endl;
     return 0;
 }

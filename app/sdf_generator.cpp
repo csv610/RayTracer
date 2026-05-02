@@ -31,7 +31,6 @@ int main(int argc, char** argv) {
     scene.addMesh(mesh);
     scene.commit();
 
-    // Spatial Hashing for fast distance queries
     int gridRes = std::max(res, 32);
     std::vector<std::vector<Vertex>> buckets(gridRes * gridRes * gridRes);
     auto getBucketIdx = [&](const Vertex& v) {
@@ -41,7 +40,6 @@ int main(int argc, char** argv) {
         return ix * gridRes * gridRes + iy * gridRes + iz;
     };
 
-    std::cout << "Bucketing surface samples..." << std::endl;
     for (const auto& t : mesh.triangles) {
         buckets[getBucketIdx(mesh.vertices[t.v0])].push_back(mesh.vertices[t.v0]);
         buckets[getBucketIdx(mesh.vertices[t.v1])].push_back(mesh.vertices[t.v1]);
@@ -55,17 +53,9 @@ int main(int argc, char** argv) {
     struct SDFPoint { Vec3 p; float dist; };
     std::vector<SDFPoint> grid(res * res * res);
 
-    std::cout << "Generating SDF grid " << res << "^3..." << std::endl;
     tbb::parallel_for(0, res * res * res, [&](int idx) {
-        int i = idx / (res * res);
-        int j = (idx / res) % res;
-        int k = idx % res;
-
-        Vec3 p = {
-            box.min.x + (i + 0.5f) * (size.x / res),
-            box.min.y + (j + 0.5f) * (size.y / res),
-            box.min.z + (k + 0.5f) * (size.z / res)
-        };
+        int i = idx / (res * res), j = (idx / res) % res, k = idx % res;
+        Vec3 p = {box.min.x + (i + 0.5f) * (size.x / res), box.min.y + (j + 0.5f) * (size.y / res), box.min.z + (k + 0.5f) * (size.z / res)};
 
         float minDistSq = 1e30f;
         int bx = std::clamp((int)((p.x - box.min.x) / size.x * gridRes), 0, gridRes - 1);
@@ -89,7 +79,6 @@ int main(int argc, char** argv) {
             }
             if (!found) searchRadius++;
         }
-
         float d = sqrt(minDistSq);
         if (scene.isInside(p)) d = -d;
         grid[idx] = {p, d};
@@ -102,7 +91,6 @@ int main(int argc, char** argv) {
         outMesh.vertexColors.push_back(getJetColor(val));
     }
     MeshIO::save(outputFile, outMesh);
-
     std::cout << "SDF grid saved to " << outputFile << std::endl;
     return 0;
 }

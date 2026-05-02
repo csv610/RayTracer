@@ -1,7 +1,7 @@
 #include "ManufacturingAnalyzer.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -21,8 +21,6 @@ int main(int argc, char** argv) {
     Mesh coloredMesh = res.getColoredMesh(mesh);
     MeshIO::save(outputFile, coloredMesh);
 
-            << " " << res.colors[i].x << " " << res.colors[i].y << " " << res.colors[i].z << "\n";
-    }
     std::cout << "Detected " << res.count << " overhang triangles. Saved to " << outputFile << std::endl;
 
     return 0;

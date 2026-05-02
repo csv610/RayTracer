@@ -1,7 +1,7 @@
 #include "SimulationSuite.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -18,9 +18,8 @@ int main(int argc, char** argv) {
 
     SimulationSuite suite(mesh);
     auto cres = suite.simulateCnc(res, toolR);
-    MeshIO::save(outF, cres);
 
-    for (const auto& t : cres.meshTriangles) out << "3 " << t.v0 << " " << t.v1 << " " << t.v2 << "\n";
+    MeshIO::save(outF, cres);
     std::cout << "CNC simulation saved to " << outF << std::endl;
     return 0;
 }

@@ -1,7 +1,7 @@
 #include "SimulationSuite.h"
 #include "MeshIO.h"
 #include <iostream>
-#include <fstream>
+#include <string>
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -19,7 +19,6 @@ int main(int argc, char** argv) {
     auto vres = suite.voxelize(res);
 
     MeshIO::save(outF, vres);
-
     std::cout << "Voxelization saved to " << outF << std::endl;
     return 0;
 }
