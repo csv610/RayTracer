@@ -1,4 +1,4 @@
-#include <embree4/rtcore.h>
+#include "RayTracer.h"
 #include <tbb/parallel_for.h>
 #include <iostream>
 #include <vector>
@@ -7,30 +7,6 @@
 #include <cstring>
 #include "mesh_utils.h"
 #include "MeshIO.h"
-
-// Robust insideness test using counting method
-bool isInside(RTCScene scene, const Vec3& p, float epsilon) {
-    RTCRayHit rh;
-    rh.ray.org_x = p.x; rh.ray.org_y = p.y; rh.ray.org_z = p.z;
-    rh.ray.dir_x = 0.314f; rh.ray.dir_y = 0.718f; rh.ray.dir_z = 0.941f;
-    float len = sqrt(rh.ray.dir_x*rh.ray.dir_x + rh.ray.dir_y*rh.ray.dir_y + rh.ray.dir_z*rh.ray.dir_z);
-    rh.ray.dir_x /= len; rh.ray.dir_y /= len; rh.ray.dir_z /= len;
-
-    rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = -1; rh.ray.time = 0;
-    rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-    RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-    
-    int intersections = 0;
-    while (true) {
-        rtcIntersect1(scene, &rh, &args);
-        if (rh.hit.geomID == RTC_INVALID_GEOMETRY_ID) break;
-        intersections++;
-        rh.ray.org_x += rh.ray.dir_x * (rh.ray.tfar + 1e-4f);
-        rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f;
-        rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-    }
-    return (intersections % 2 != 0);
-}
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -49,20 +25,11 @@ int main(int argc, char** argv) {
     for (const auto& v : mesh.vertices) box.expand(v);
     box.pad(0.1f);
     Vec3 size = box.size();
-    float diag = sqrt(size.x*size.x + size.y*size.y + size.z*size.z);
+    float diag = size.length();
 
-    // Initialize Embree
-    RTCDevice device = rtcNewDevice(nullptr);
-    RTCScene scene = rtcNewScene(device);
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene);
+    Scene scene;
+    scene.addMesh(mesh);
+    scene.commit();
 
     // Spatial Hashing for fast distance queries
     int gridRes = std::max(res, 32);
@@ -100,32 +67,31 @@ int main(int argc, char** argv) {
             box.min.z + (k + 0.5f) * (size.z / res)
         };
 
-        // Search neighboring buckets for the closest point
         float minDistSq = 1e30f;
         int bx = std::clamp((int)((p.x - box.min.x) / size.x * gridRes), 0, gridRes - 1);
         int by = std::clamp((int)((p.y - box.min.y) / size.y * gridRes), 0, gridRes - 1);
         int bz = std::clamp((int)((p.z - box.min.z) / size.z * gridRes), 0, gridRes - 1);
 
-        int searchRadius = 2; // Start with 1, expand if necessary
+        int searchRadius = 2;
         bool found = false;
         while (!found && searchRadius < gridRes) {
             for (int dx = -searchRadius; dx <= searchRadius; ++dx) {
                 for (int dy = -searchRadius; dy <= searchRadius; ++dy) {
                     for (int dz = -searchRadius; dz <= searchRadius; ++dz) {
                         int nx = bx + dx, ny = by + dy, nz = bz + dz;
-    Mesh outMesh;
-    for (const auto& sp : grid) {
-        outMesh.vertices.push_back({sp.p.x, sp.p.y, sp.p.z});
-        float val = std::clamp((sp.dist / (diag * 0.15f) + 1.0f) * 0.5f, 0.0f, 1.0f);
-        outMesh.vertexColors.push_back(getJetColor(val));
-    }
-    MeshIO::save(outputFile, outMesh);
-
+                        if (nx < 0 || nx >= gridRes || ny < 0 || ny >= gridRes || nz < 0 || nz >= gridRes) continue;
+                        for (const auto& s : buckets[nx * gridRes * gridRes + ny * gridRes + nz]) {
+                            float dist2 = (s.x-p.x)*(s.x-p.x) + (s.y-p.y)*(s.y-p.y) + (s.z-p.z)*(s.z-p.z);
+                            if (dist2 < minDistSq) { minDistSq = dist2; found = true; }
+                        }
+                    }
+                }
+            }
             if (!found) searchRadius++;
         }
 
         float d = sqrt(minDistSq);
-        if (isInside(scene, p, diag * 0.0001f)) d = -d;
+        if (scene.isInside(p)) d = -d;
         grid[idx] = {p, d};
     });
 
@@ -137,8 +103,6 @@ int main(int argc, char** argv) {
     }
     MeshIO::save(outputFile, outMesh);
 
-
     std::cout << "SDF grid saved to " << outputFile << std::endl;
-    rtcReleaseScene(scene); rtcReleaseDevice(device);
     return 0;
 }

@@ -2,7 +2,7 @@
 #define ASSEMBLY_ANALYZER_H
 
 #include "mesh_utils.h"
-#include <embree4/rtcore.h>
+#include "RayTracer.h"
 #include <vector>
 
 class AssemblyAnalyzer {
@@ -28,12 +28,10 @@ public:
 private:
     const Mesh& part;
     const Mesh& env;
-    RTCDevice device;
-    RTCScene envScene;
-    RTCScene combinedScene;
+    Scene envScene;
+    Scene combinedScene;
 
     void buildScenes();
-    bool checkInside(RTCScene scene, const Vec3& p) const;
 };
 
 #endif

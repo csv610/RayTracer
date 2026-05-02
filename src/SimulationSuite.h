@@ -2,7 +2,7 @@
 #define SIMULATION_SUITE_H
 
 #include "mesh_utils.h"
-#include <embree4/rtcore.h>
+#include "RayTracer.h"
 #include <vector>
 #include <string>
 
@@ -22,8 +22,7 @@ public:
 
 private:
     const Mesh& mesh;
-    RTCDevice device;
-    RTCScene scene;
+    Scene scene;
     void buildScene();
 };
 

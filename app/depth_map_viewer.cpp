@@ -1,4 +1,6 @@
-#include <embree4/rtcore.h>
+#include "RayTracer.h"
+#include "MeshIO.h"
+#include "ShapeDiameter.h"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -6,10 +8,8 @@
 #include <cmath>
 #include <memory>
 #include <numeric>
-#include "mesh_utils.h"
-#include "MeshIO.h"
-#include "ShapeDiameter.h"
 #include <tbb/parallel_for.h>
+
 
 #include <QApplication>
 #include <QGLViewer/qglviewer.h>
@@ -121,12 +121,17 @@ void DepthMapVis::computeDepthMaps() {
         Vec3 org, dir;
         if (axis == 0) { u_size = size.z; v_size = size.y; w_size = size.x; dir = (side == 0) ? Vec3{1, 0, 0} : Vec3{-1, 0, 0}; org.x = (side == 0) ? box.min.x : box.max.x; }
         else if (axis == 1) { u_size = size.x; v_size = size.z; w_size = size.y; dir = (side == 0) ? Vec3{0, 1, 0} : Vec3{0, -1, 0}; org.y = (side == 0) ? box.min.y : box.max.y; }
-        else { u_size = size.x; v_size = size.y; w_size = size.z; dir = (side == 0) ? Vec3{0, 0, 1} : Vec3{0, 0, -1}; org.z = (side == 0) ? box.min.z : box.max.z; }
+            Ray ray;
+            if (axis == 0) { ray.org = {org.x, box.min.y + v * v_size, box.min.z + u * u_size}; }
+            else if (axis == 1) { ray.org = {box.min.x + u * u_size, org.y, box.min.z + v * v_size}; }
+            else { ray.org = {box.min.x + u * u_size, box.min.y + v * v_size, org.z}; }
+            ray.dir = dir;
+            ray.tnear = 0.0f; ray.tfar = w_size * 1.1f;
 
-        std::vector<unsigned char> data(res * res * 3);
-        tbb::parallel_for(0, res * res, [&](int p) {
-            int iu = p % res; int iv = p / res;
-            float u = (iu + 0.5f) / res; float v = (iv + 0.5f) / res;
+            Hit hit = RayTracer::intersect(sd->getScene(), ray);
+            Vec3 color = {0, 0, 0};
+            if (hit.hit) color = getJetColor(1.0f - (hit.t / (w_size + 1e-6f)));
+
             RTCRayHit rh;
             if (axis == 0) { rh.ray.org_x = org.x; rh.ray.org_y = box.min.y + v * v_size; rh.ray.org_z = box.min.z + u * u_size; }
             else if (axis == 1) { rh.ray.org_x = box.min.x + u * u_size; rh.ray.org_y = org.y; rh.ray.org_z = box.min.z + v * v_size; }

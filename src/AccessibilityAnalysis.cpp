@@ -1,25 +1,14 @@
 #include "AccessibilityAnalysis.h"
+#include <tbb/parallel_for.h>
+#include <cstring>
+#include <cmath>
 
 AccessibilityAnalysis::AccessibilityAnalysis(const Mesh& mesh) : mesh_(mesh) {
-    device_ = rtcNewDevice(nullptr);
-    scene_ = rtcNewScene(device_);
-    RTCGeometry geom = rtcNewGeometry(device_, RTC_GEOMETRY_TYPE_TRIANGLE);
-
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh_.vertices.size());
-    memcpy(vb, mesh_.vertices.data(), mesh_.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh_.triangles.size());
-    memcpy(ib, mesh_.triangles.data(), mesh_.triangles.size() * sizeof(Triangle));
-
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene_, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene_);
+    scene_.addSharedMesh(mesh_);
+    scene_.commit();
 }
 
-AccessibilityAnalysis::~AccessibilityAnalysis() {
-    if (scene_) rtcReleaseScene(scene_);
-    if (device_) rtcReleaseDevice(device_);
-}
+AccessibilityAnalysis::~AccessibilityAnalysis() {}
 
 void AccessibilityAnalysis::analyze(float toolRadius) {
     Vertex center;
@@ -52,24 +41,13 @@ void AccessibilityAnalysis::analyze(float toolRadius) {
                 dy = sin(angle) * toolRadius;
             }
 
-            RTCRayHit rh;
-            rh.ray.org_x = faceCenter.x + dx;
-            rh.ray.org_y = faceCenter.y + dy;
-            rh.ray.org_z = faceCenter.z + epsilon;
-            rh.ray.dir_x = 0;
-            rh.ray.dir_y = 0;
-            rh.ray.dir_z = 1.0f; 
-            rh.ray.tnear = 0.0f;
-            rh.ray.tfar = rayLength;
-            rh.ray.mask = -1;
-            rh.ray.time = 0;
-            rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+            Ray ray;
+            ray.org = {faceCenter.x + dx, faceCenter.y + dy, faceCenter.z + epsilon};
+            ray.dir = {0, 0, 1.0f}; 
+            ray.tnear = 0.0f;
+            ray.tfar = rayLength;
 
-            RTCIntersectArguments args;
-            rtcInitIntersectArguments(&args);
-            rtcIntersect1(scene_, &rh, &args);
-
-            if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+            if (RayTracer::occluded(scene_, ray)) {
                 accessible = false;
                 break;
             }

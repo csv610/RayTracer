@@ -1,14 +1,10 @@
 #ifndef ACCESSIBILITY_ANALYSIS_H
 #define ACCESSIBILITY_ANALYSIS_H
 
-#include <embree4/rtcore.h>
 #include <vector>
 #include <string>
-#include <algorithm>
-#include <cstring>
-#include <cmath>
-#include <tbb/parallel_for.h>
 #include "mesh_utils.h"
+#include "RayTracer.h"
 
 class AccessibilityAnalysis {
 public:
@@ -22,8 +18,7 @@ public:
 
 private:
     const Mesh& mesh_;
-    RTCDevice device_ = nullptr;
-    RTCScene scene_ = nullptr;
+    Scene scene_;
     std::vector<Vec3> triColors_;
     int inaccessibleCount_ = 0;
 };

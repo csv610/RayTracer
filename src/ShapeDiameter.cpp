@@ -6,16 +6,10 @@
 #include <cstring>
 
 ShapeDiameter::ShapeDiameter(const Mesh& mesh) : mesh(mesh) {
-    device = rtcNewDevice(nullptr);
-    if (device == nullptr) throw std::runtime_error("Failed to create Embree device");
-    scene = rtcNewScene(device);
     buildScene();
 }
 
-ShapeDiameter::~ShapeDiameter() {
-    if (scene) rtcReleaseScene(scene);
-    if (device) rtcReleaseDevice(device);
-}
+ShapeDiameter::~ShapeDiameter() {}
 
 void ShapeDiameter::compute(int numTheta, int numPhi, float coneAngle) {
     int numTris = (int)mesh.triangles.size();
@@ -46,7 +40,7 @@ void ShapeDiameter::computeForFace(int triIdx, std::vector<RayHit>& hits, int nu
     Vec3 tangent = {inwardNormal.y * up.z - inwardNormal.z * up.y,
                     inwardNormal.z * up.x - inwardNormal.x * up.z,
                     inwardNormal.x * up.y - inwardNormal.y * up.x};
-    float tLen = sqrt(tangent.x*tangent.x + tangent.y*tangent.y + tangent.z*tangent.z);
+    float tLen = tangent.length();
     if (tLen > 0) { tangent.x /= tLen; tangent.y /= tLen; tangent.z /= tLen; }
     
     Vec3 bitangent = {inwardNormal.y * tangent.z - inwardNormal.z * tangent.y,
@@ -64,16 +58,15 @@ void ShapeDiameter::computeForFace(int triIdx, std::vector<RayHit>& hits, int nu
                 (tangent.y * cosP + bitangent.y * sinP) * sinT + inwardNormal.y * cosT,
                 (tangent.z * cosP + bitangent.z * sinP) * sinT + inwardNormal.z * cosT
             };
-            RTCRayHit rh;
+            Ray ray;
             float epsilon = 0.0001f;
-            rh.ray.org_x = faceCenter.x + inwardNormal.x * epsilon;
-            rh.ray.org_y = faceCenter.y + inwardNormal.y * epsilon;
-            rh.ray.org_z = faceCenter.z + inwardNormal.z * epsilon;
-            rh.ray.dir_x = rayDir.x; rh.ray.dir_y = rayDir.y; rh.ray.dir_z = rayDir.z;
-            rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = -1; rh.ray.time = 0; rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-            RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-            rtcIntersect1(scene, &rh, &args);
-            if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) hits.push_back({(int)rh.hit.primID, rayDir, rh.ray.tfar});
+            ray.org = {faceCenter.x + inwardNormal.x * epsilon, faceCenter.y + inwardNormal.y * epsilon, faceCenter.z + inwardNormal.z * epsilon};
+            ray.dir = rayDir;
+            ray.tnear = 0.0f;
+            ray.tfar = 1e10f;
+            
+            Hit hit = RayTracer::intersect(scene, ray);
+            if(hit.hit) hits.push_back({(int)hit.primID, rayDir, hit.t});
         }
     }
 }
@@ -92,13 +85,6 @@ void ShapeDiameter::getStats(float& minD, float& maxD, float& avgD) const {
 }
 
 void ShapeDiameter::buildScene() {
-    RTCGeometry triangleMesh = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(triangleMesh, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(triangleMesh);
-    rtcAttachGeometry(scene, triangleMesh);
-    rtcReleaseGeometry(triangleMesh);
-    rtcCommitScene(scene);
+    scene.addSharedMesh(mesh);
+    scene.commit();
 }

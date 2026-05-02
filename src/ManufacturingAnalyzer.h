@@ -2,8 +2,8 @@
 #define MANUFACTURING_ANALYZER_H
 
 #include "mesh_utils.h"
+#include "RayTracer.h"
 #include <vector>
-#include <embree4/rtcore.h>
 
 class ManufacturingAnalyzer {
 public:
@@ -30,8 +30,7 @@ public:
 
 private:
     const Mesh& mesh;
-    RTCDevice device;
-    RTCScene scene;
+    Scene scene;
     float meshDiag;
 
     void buildScene();

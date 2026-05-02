@@ -7,8 +7,6 @@
 #include <cmath>
 
 ManufacturingAnalyzer::ManufacturingAnalyzer(const Mesh& mesh) : mesh(mesh) {
-    device = rtcNewDevice(nullptr);
-    scene = rtcNewScene(device);
     buildScene();
 
     AABB bbox;
@@ -17,21 +15,11 @@ ManufacturingAnalyzer::ManufacturingAnalyzer(const Mesh& mesh) : mesh(mesh) {
     meshDiag = sqrt(size.x*size.x + size.y*size.y + size.z*size.z);
 }
 
-ManufacturingAnalyzer::~ManufacturingAnalyzer() {
-    if (scene) rtcReleaseScene(scene);
-    if (device) rtcReleaseDevice(device);
-}
+ManufacturingAnalyzer::~ManufacturingAnalyzer() {}
 
 void ManufacturingAnalyzer::buildScene() {
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene);
+    scene.addSharedMesh(mesh);
+    scene.commit();
 }
 
 ManufacturingAnalyzer::Result ManufacturingAnalyzer::analyzeUndercuts(Vec3 pullDir) const {
@@ -54,16 +42,13 @@ ManufacturingAnalyzer::Result ManufacturingAnalyzer::analyzeUndercuts(Vec3 pullD
                 if (dot < -0.01f) {
                     undercut = true;
                 } else {
-                    RTCRayHit rh;
-                    rh.ray.org_x = faceCenter.x + normal.x * epsilon;
-                    rh.ray.org_y = faceCenter.y + normal.y * epsilon;
-                    rh.ray.org_z = faceCenter.z + normal.z * epsilon;
-                    rh.ray.dir_x = pullDir.x; rh.ray.dir_y = pullDir.y; rh.ray.dir_z = pullDir.z;
-                    rh.ray.tnear = 0.0f; rh.ray.tfar = meshDiag * 2.0f; rh.ray.mask = -1;
-                    rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-                    RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-                    rtcIntersect1(scene, &rh, &args);
-                    if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) undercut = true;
+                    Ray ray;
+                    ray.org = {faceCenter.x + normal.x * epsilon, faceCenter.y + normal.y * epsilon, faceCenter.z + normal.z * epsilon};
+                    ray.dir = pullDir;
+                    ray.tnear = 0.0f;
+                    ray.tfar = meshDiag * 2.0f;
+                    
+                    if (RayTracer::occluded(scene, ray)) undercut = true;
                 }
                 if (undercut) {
                     res.colors[i] = {1, 0, 0}; localCount++;

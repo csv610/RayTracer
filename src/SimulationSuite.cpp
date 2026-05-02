@@ -7,26 +7,14 @@
 #include <fstream>
 
 SimulationSuite::SimulationSuite(const Mesh& mesh) : mesh(mesh) {
-    device = rtcNewDevice(nullptr);
-    scene = rtcNewScene(device);
     buildScene();
 }
 
-SimulationSuite::~SimulationSuite() {
-    rtcReleaseScene(scene);
-    rtcReleaseDevice(device);
-}
+SimulationSuite::~SimulationSuite() {}
 
 void SimulationSuite::buildScene() {
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene);
+    scene.addSharedMesh(mesh);
+    scene.commit();
 }
 
 Mesh SimulationSuite::voxelize(int res) const {
@@ -40,11 +28,7 @@ Mesh SimulationSuite::voxelize(int res) const {
     tbb::parallel_for(0, nz, [&](int z) {
         for(int y=0; y<ny; ++y) for(int x=0; x<nx; ++x) {
             Vec3 p = {minB.x + (x+0.5f)*vSize, minB.y + (y+0.5f)*vSize, minB.z + (z+0.5f)*vSize};
-            RTCRayHit rh; rh.ray.org_x=p.x; rh.ray.org_y=p.y; rh.ray.org_z=p.z; rh.ray.dir_x=0.3f; rh.ray.dir_y=0.7f; rh.ray.dir_z=0.9f;
-            rh.ray.tnear=0; rh.ray.tfar=1e10f; rh.ray.mask=-1; rh.hit.geomID=RTC_INVALID_GEOMETRY_ID;
-            RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-            int hits=0; while(true) { rtcIntersect1(scene, &rh, &args); if(rh.hit.geomID==RTC_INVALID_GEOMETRY_ID) break; hits++; rh.ray.tnear=rh.ray.tfar+1e-4f; rh.ray.tfar=1e10f; rh.hit.geomID=RTC_INVALID_GEOMETRY_ID; }
-            if(hits%2 != 0) grid[(z*ny+y)*nx+x] = 1;
+            if(scene.isInside(p)) grid[(z*ny+y)*nx+x] = 1;
         }
     });
 
@@ -74,11 +58,7 @@ void SimulationSuite::slice(int numLayers, int res, const std::string& prefix) c
         tbb::parallel_for(0, res, [&](int y) {
             for(int x=0; x<res; ++x) {
                 Vec3 p = {bbox.min.x+(x+0.5f)*(size.x/res), bbox.min.y+(y+0.5f)*(size.y/res), z};
-                RTCRayHit rh; rh.ray.org_x=p.x; rh.ray.org_y=p.y; rh.ray.org_z=p.z; rh.ray.dir_x=0.3f; rh.ray.dir_y=0.7f; rh.ray.dir_z=0.9f;
-                rh.ray.tnear=0; rh.ray.tfar=1e10f; rh.ray.mask=-1; rh.hit.geomID=RTC_INVALID_GEOMETRY_ID;
-                RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-                int hits=0; while(true) { rtcIntersect1(scene, &rh, &args); if(rh.hit.geomID==RTC_INVALID_GEOMETRY_ID) break; hits++; rh.ray.tnear=rh.ray.tfar+1e-4f; rh.ray.tfar=1e10f; rh.hit.geomID=RTC_INVALID_GEOMETRY_ID; }
-                if(hits%2 != 0) data[y*res+x] = 255;
+                if(scene.isInside(p)) data[y*res+x] = 255;
             }
         });
         if(l % std::max(1, numLayers/5) == 0) {
@@ -94,10 +74,14 @@ Mesh SimulationSuite::simulateCnc(int res, float toolRadius) const {
     tbb::parallel_for(0, res, [&](int y) {
         for(int x=0; x<res; ++x) {
             float px = bbox.min.x+(x+0.5f)*(size.x/res), py = bbox.min.y+(y+0.5f)*(size.y/res);
-            RTCRayHit rh; rh.ray.org_x=px; rh.ray.org_y=py; rh.ray.org_z=bbox.max.z+size.z*0.1f; rh.ray.dir_x=0; rh.ray.dir_y=0; rh.ray.dir_z=-1;
-            rh.ray.tnear=0; rh.ray.tfar=size.z*1.5f; rh.ray.mask=-1; rh.hit.geomID=RTC_INVALID_GEOMETRY_ID;
-            RTCIntersectArguments args; rtcInitIntersectArguments(&args); rtcIntersect1(scene, &rh, &args);
-            if(rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) targetH[y*res+x] = rh.ray.org_z - rh.ray.tfar;
+            Ray ray;
+            ray.org = {px, py, bbox.max.z + size.z * 0.1f};
+            ray.dir = {0, 0, -1};
+            ray.tnear = 0.0f;
+            ray.tfar = size.z * 1.5f;
+            
+            Hit hit = RayTracer::intersect(scene, ray);
+            if(hit.hit) targetH[y*res+x] = ray.org.z - hit.t;
         }
     });
     int pR = (int)ceil(toolRadius / (size.x/res));

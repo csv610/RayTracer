@@ -1,30 +1,22 @@
 #include "CurvatureAnalyzer.h"
+#include <tbb/parallel_for.h>
 #include <iostream>
+#include <cstring>
+#include <cmath>
+#include <set>
+#include <stdexcept>
 
-CurvatureAnalyzer::CurvatureAnalyzer(const Mesh& m) : mesh(m), device(nullptr), scene(nullptr) {
-    device = rtcNewDevice(nullptr);
-    if (!device) throw std::runtime_error("Failed to create Embree device");
-    scene = rtcNewScene(device);
+CurvatureAnalyzer::CurvatureAnalyzer(const Mesh& m) : mesh(m) {
     buildScene();
     buildConnectivity();
     computeVertexNormals();
 }
 
-CurvatureAnalyzer::~CurvatureAnalyzer() {
-    if (scene) rtcReleaseScene(scene);
-    if (device) rtcReleaseDevice(device);
-}
+CurvatureAnalyzer::~CurvatureAnalyzer() {}
 
 void CurvatureAnalyzer::buildScene() {
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene);
+    scene.addSharedMesh(mesh);
+    scene.commit();
 }
 
 void CurvatureAnalyzer::buildConnectivity() {
@@ -59,7 +51,7 @@ void CurvatureAnalyzer::computeVertexNormals() {
         vertexNormals[tri.v2].x += n.x; vertexNormals[tri.v2].y += n.y; vertexNormals[tri.v2].z += n.z;
     }
     for (auto& n : vertexNormals) {
-        float len = sqrt(n.x*n.x + n.y*n.y + n.z*n.z);
+        float len = n.length();
         if (len > 0) { n.x /= len; n.y /= len; n.z /= len; }
     }
 }
@@ -85,8 +77,8 @@ float CurvatureAnalyzer::computeGaussianCurvature(unsigned int vidx) {
         Vec3 e1 = {p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
         Vec3 e2 = {p2.x - p0.x, p2.y - p0.y, p2.z - p0.z};
 
-        float len1 = sqrt(e1.x*e1.x + e1.y*e1.y + e1.z*e1.z);
-        float len2 = sqrt(e2.x*e2.x + e2.y*e2.y + e2.z*e2.z);
+        float len1 = e1.length();
+        float len2 = e2.length();
         if (len1 > 1e-6 && len2 > 1e-6) {
             float dot = (e1.x*e2.x + e1.y*e2.y + e1.z*e2.z) / (len1 * len2);
             dot = std::max(-1.0f, std::min(1.0f, dot));
@@ -94,7 +86,7 @@ float CurvatureAnalyzer::computeGaussianCurvature(unsigned int vidx) {
         }
 
         Vec3 cross = {e1.y*e2.z - e1.z*e2.y, e1.z*e2.x - e1.x*e2.z, e1.x*e2.y - e1.y*e2.x};
-        float crossLen = sqrt(cross.x*cross.x + cross.y*cross.y + cross.z*cross.z);
+        float crossLen = cross.length();
         areaSum += crossLen * 0.5f;
     }
 
@@ -122,13 +114,12 @@ float CurvatureAnalyzer::computeMeanCurvature(unsigned int vidx) {
             Vec3 e1 = {p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
             Vec3 e2 = {p2.x - p0.x, p2.y - p0.y, p2.z - p0.z};
 
-            float len1 = sqrt(e1.x*e1.x + e1.y*e1.y + e1.z*e1.z);
-            float len2 = sqrt(e2.x*e2.x + e2.y*e2.y + e2.z*e2.z);
+            float len1 = e1.length();
+            float len2 = e2.length();
             if (len1 < 1e-6 || len2 < 1e-6) continue;
 
-            float crossLen = sqrt(pow(e1.y*e2.z - e1.z*e2.y, 2) +
-                                  pow(e1.z*e2.x - e1.x*e2.z, 2) +
-                                  pow(e1.x*e2.y - e1.y*e2.x, 2));
+            Vec3 cross = {e1.y*e2.z - e1.z*e2.y, e1.z*e2.x - e1.x*e2.z, e1.x*e2.y - e1.y*e2.x};
+            float crossLen = cross.length();
             if (crossLen < 1e-6) continue;
 
             float weight = crossLen / (len1 * len2);
@@ -165,7 +156,7 @@ float CurvatureAnalyzer::computeConcavity(unsigned int vidx, float avgEdgeLen) {
         dir.z = cos(phi);
 
         Vec3 tangent = {dir.y * n.z - dir.z * n.y, dir.z * n.x - dir.x * n.z, dir.x * n.y - dir.y * n.x};
-        float tlen = sqrt(tangent.x*tangent.x + tangent.y*tangent.y + tangent.z*tangent.z);
+        float tlen = tangent.length();
         if (tlen > 1e-6) {
             tangent.x /= tlen; tangent.y /= tlen; tangent.z /= tlen;
         } else {
@@ -182,32 +173,20 @@ float CurvatureAnalyzer::computeConcavity(unsigned int vidx, float avgEdgeLen) {
             rayDir.y = tangent.y * s + bitangent.y * c + n.y * (1 - c);
             rayDir.z = tangent.z * s + bitangent.z * c + n.z * (1 - c);
 
-            float rlen = sqrt(rayDir.x*rayDir.x + rayDir.y*rayDir.y + rayDir.z*rayDir.z);
+            float rlen = rayDir.length();
             if (rlen > 1e-6) {
                 rayDir.x /= rlen; rayDir.y /= rlen; rayDir.z /= rlen;
             }
 
-            RTCRayHit rh;
-            rh.ray.org_x = p0.x + n.x * avgEdgeLen * 0.01f;
-            rh.ray.org_y = p0.y + n.y * avgEdgeLen * 0.01f;
-            rh.ray.org_z = p0.z + n.z * avgEdgeLen * 0.01f;
-            rh.ray.dir_x = rayDir.x;
-            rh.ray.dir_y = rayDir.y;
-            rh.ray.dir_z = rayDir.z;
-            rh.ray.tnear = 0.0f;
-            rh.ray.tfar = avgEdgeLen * 5.0f;
-            rh.ray.mask = -1;
-            rh.ray.time = 0.0f;
-            rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-            rh.hit.primID = RTC_INVALID_GEOMETRY_ID;
+            Ray ray;
+            ray.org = {p0.x + n.x * avgEdgeLen * 0.01f, p0.y + n.y * avgEdgeLen * 0.01f, p0.z + n.z * avgEdgeLen * 0.01f};
+            ray.dir = rayDir;
+            ray.tnear = 0.0f;
+            ray.tfar = avgEdgeLen * 5.0f;
 
-            RTCIntersectArguments args;
-            rtcInitIntersectArguments(&args);
-            rtcIntersect1(scene, &rh, &args);
-
-            if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-                float dist = rh.ray.tfar;
-                if (dist > avgEdgeLen * 0.5f) {
+            Hit hit = RayTracer::intersect(scene, ray);
+            if (hit.hit) {
+                if (hit.t > avgEdgeLen * 0.5f) {
                     concavityScore += 1.0f;
                 }
                 validRays++;
@@ -244,31 +223,20 @@ float CurvatureAnalyzer::computePocketDepth(unsigned int vidx, float avgEdgeLen)
         rayDir.y = tangent.y * sa * c + bitangent.y * sa * s + n.y * ca;
         rayDir.z = tangent.z * sa * c + bitangent.z * sa * s + n.z * ca;
 
-        float rlen = sqrt(rayDir.x*rayDir.x + rayDir.y*rayDir.y + rayDir.z*rayDir.z);
+        float rlen = rayDir.length();
         if (rlen > 1e-6) {
             rayDir.x /= rlen; rayDir.y /= rlen; rayDir.z /= rlen;
         }
 
-        RTCRayHit rh;
-        rh.ray.org_x = p0.x + n.x * avgEdgeLen * 0.001f;
-        rh.ray.org_y = p0.y + n.y * avgEdgeLen * 0.001f;
-        rh.ray.org_z = p0.z + n.z * avgEdgeLen * 0.001f;
-        rh.ray.dir_x = rayDir.x;
-        rh.ray.dir_y = rayDir.y;
-        rh.ray.dir_z = rayDir.z;
-        rh.ray.tnear = 0.0f;
-        rh.ray.tfar = avgEdgeLen * 10.0f;
-        rh.ray.mask = -1;
-        rh.ray.time = 0.0f;
-        rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-        rh.hit.primID = RTC_INVALID_GEOMETRY_ID;
+        Ray ray;
+        ray.org = {p0.x + n.x * avgEdgeLen * 0.001f, p0.y + n.y * avgEdgeLen * 0.001f, p0.z + n.z * avgEdgeLen * 0.001f};
+        ray.dir = rayDir;
+        ray.tnear = 0.0f;
+        ray.tfar = avgEdgeLen * 10.0f;
 
-        RTCIntersectArguments args;
-        rtcInitIntersectArguments(&args);
-        rtcIntersect1(scene, &rh, &args);
-
-        if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID && rh.ray.tfar < avgEdgeLen * 8.0f) {
-            maxDist = std::max(maxDist, rh.ray.tfar);
+        Hit hit = RayTracer::intersect(scene, ray);
+        if (hit.hit && hit.t < avgEdgeLen * 8.0f) {
+            maxDist = std::max(maxDist, hit.t);
         }
     }
 
