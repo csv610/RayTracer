@@ -15,6 +15,10 @@ struct Vec3 {
     float length() const { return std::sqrt(x*x + y*y + z*z); }
 };
 
+struct Color4b {
+    unsigned char r, g, b, a;
+};
+
 struct AABB {
     Vertex min, max;
     AABB() : min{1e10, 1e10, 1e10}, max{-1e10, -1e10, -1e10} {}
@@ -29,8 +33,8 @@ struct AABB {
 struct Mesh {
     std::vector<Vertex> vertices;
     std::vector<Triangle> triangles;
-    std::vector<Vec3> vertexColors;
-    std::vector<Vec3> faceColors;
+    std::vector<Color4b> vertexColors;
+    std::vector<Color4b> faceColors;
     std::vector<Vec3> vertexNormals;
 };
 
@@ -70,12 +74,12 @@ inline Vec3 computeFaceCenter(const Vertex& v0, const Vertex& v1, const Vertex& 
             (v0.z + v1.z + v2.z) / 3.0f};
 }
 
-inline Vec3 getJetColor(float t) {
+inline Color4b getJetColor(float t) {
     t = std::max(0.0f, std::min(1.0f, t));
     float r = std::max(0.0f, std::min(1.0f, std::min(4.0f * t - 1.5f, -4.0f * t + 4.5f)));
     float g = std::max(0.0f, std::min(1.0f, std::min(4.0f * t - 0.5f, -4.0f * t + 3.5f)));
     float b = std::max(0.0f, std::min(1.0f, std::min(4.0f * t + 0.5f, -4.0f * t + 2.5f)));
-    return {r, g, b};
+    return {(unsigned char)(r * 255.0f), (unsigned char)(g * 255.0f), (unsigned char)(b * 255.0f), 255};
 }
 
 inline void createUVSphere(Mesh& mesh, int stacks, int slices, float radius) {

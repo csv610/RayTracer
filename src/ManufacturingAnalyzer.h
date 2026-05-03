@@ -8,7 +8,7 @@
 class ManufacturingAnalyzer {
 public:
     struct Result {
-        std::vector<Vec3> colors;
+        std::vector<Color4b> colors;
         int count = 0;
         Mesh getColoredMesh(const Mesh& original) const {
             Mesh m = original;

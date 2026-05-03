@@ -8,7 +8,7 @@
 class VisibilityAnalyzer {
 public:
     struct Result {
-        std::vector<Vec3> colors;
+        std::vector<Color4b> colors;
         int visibleCount;
         Mesh getColoredMesh(const Mesh& original) const;
     };

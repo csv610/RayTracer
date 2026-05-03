@@ -17,7 +17,7 @@ void VisibilityAnalyzer::buildScene() {
 
 VisibilityAnalyzer::Result VisibilityAnalyzer::computeVisibility(int numTheta, int numPhi) const {
     Result res;
-    res.colors.assign(mesh.triangles.size(), {1.0f, 0.0f, 0.0f});
+    res.colors.assign(mesh.triangles.size(), {255, 0, 0, 255});
     res.visibleCount = 0;
 
     for (size_t triIdx = 0; triIdx < mesh.triangles.size(); ++triIdx) {
@@ -58,7 +58,7 @@ VisibilityAnalyzer::Result VisibilityAnalyzer::computeVisibility(int numTheta, i
 
         if (isVisible) {
             res.visibleCount++;
-            res.colors[triIdx] = {0.0f, 1.0f, 0.0f};
+            res.colors[triIdx] = {0, 255, 0, 255};
         }
     }
     return res;

@@ -63,9 +63,7 @@ inline void test_structural_caliper() {
     assert(!results.empty());
     for (const auto& r : results) {
         assert(r.thickness > 0);
-        assert(r.color.x >= 0 && r.color.x <= 1);
-        assert(r.color.y >= 0 && r.color.y <= 1);
-        assert(r.color.z >= 0 && r.color.z <= 1);
+        assert(r.color.r <= 255 && r.color.g <= 255 && r.color.b <= 255);
     }
     
     std::cout << "test_structural_caliper passed!" << std::endl;
@@ -193,15 +191,13 @@ inline void test_aabb() {
 }
 
 inline void test_jet_color() {
-    Vec3 c0 = getJetColor(0.0f);
-    Vec3 c1 = getJetColor(0.5f);
-    Vec3 c2 = getJetColor(1.0f);
+    Color4b c0 = getJetColor(0.0f);
+    Color4b c1 = getJetColor(0.5f);
+    Color4b c2 = getJetColor(1.0f);
     
-    assert(c0.x >= 0 && c0.x <= 1);
-    assert(c0.y >= 0 && c0.y <= 1);
-    assert(c0.z >= 0 && c0.z <= 1);
-    assert(c1.x >= 0 && c1.x <= 1);
-    assert(c2.x >= 0 && c2.x <= 1);
+    assert(c0.r <= 255 && c0.g <= 255 && c0.b <= 255);
+    assert(c1.r <= 255 && c1.g <= 255 && c1.b <= 255);
+    assert(c2.r <= 255 && c2.g <= 255 && c2.b <= 255);
     
     std::cout << "test_jet_color passed!" << std::endl;
 }

@@ -57,12 +57,12 @@ std::vector<StructuralCaliper::AnalysisResult> StructuralCaliper::analyze(int nu
 
         float thickness = (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) ? rh.ray.tfar : 1e10f;
         
-        Vec3 color;
+        Color4b color;
         if (thickness < threshold) {
             float t = std::clamp(thickness / threshold, 0.0f, 1.0f);
-            color = {1.0f, t, 0.0f}; // Red (0) to Yellow (threshold)
+            color = {(unsigned char)(255.0f), (unsigned char)(t * 255.0f), 0, 255}; // Red (0) to Yellow (threshold)
         } else {
-            color = {0.0f, 1.0f, 0.0f}; // Green (Safe)
+            color = {0, 255, 0, 255}; // Green (Safe)
         }
         
         results[i] = {sp.p, thickness, color};

@@ -72,15 +72,15 @@ void test_readOFF() {
 }
 
 void test_getJetColor() {
-    Vec3 c0 = getJetColor(0.0f);
-    assert(std::abs(c0.x) < 1e-6);
-    assert(std::abs(c0.y) < 1e-6);
-    assert(std::abs(c0.z - 0.5f) < 1e-6); // Jet at 0 is blue-ish
+    Color4b c0 = getJetColor(0.0f);
+    assert(c0.r == 0);
+    assert(c0.g == 0);
+    assert(c0.b == 128); // Jet at 0 is blue-ish
 
-    Vec3 c1 = getJetColor(1.0f);
-    assert(std::abs(c1.x - 0.5f) < 1e-6); // Jet at 1 is red-ish
-    assert(std::abs(c1.y) < 1e-6);
-    assert(std::abs(c1.z) < 1e-6);
+    Color4b c1 = getJetColor(1.0f);
+    assert(c1.r == 128); // Jet at 1 is red-ish
+    assert(c1.g == 0);
+    assert(c1.b == 0);
     
     std::cout << "test_getJetColor passed!" << std::endl;
 }
@@ -89,8 +89,8 @@ void test_mesh_colors() {
     Mesh mesh;
     mesh.vertices = {{0,0,0}, {1,0,0}, {0,1,0}};
     mesh.triangles = {{0,1,2}};
-    mesh.vertexColors = {{1,0,0}, {0,1,0}, {0,0,1}};
-    mesh.faceColors = {{1,1,1}};
+    mesh.vertexColors = {{255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255}};
+    mesh.faceColors = {{255, 255, 255, 255}};
 
     const std::string filename = "test_colors.ply";
     bool success = MeshIO::save(filename, mesh);
@@ -101,13 +101,13 @@ void test_mesh_colors() {
     assert(success);
     assert(loaded.vertices.size() == 3);
     assert(loaded.vertexColors.size() == 3);
-    assert(std::abs(loaded.vertexColors[0].x - 1.0f) < 0.01f);
-    assert(std::abs(loaded.vertexColors[1].y - 1.0f) < 0.01f);
-    assert(std::abs(loaded.vertexColors[2].z - 1.0f) < 0.01f);
+    assert(loaded.vertexColors[0].r == 255);
+    assert(loaded.vertexColors[1].g == 255);
+    assert(loaded.vertexColors[2].b == 255);
     
     // Face colors loading is a bit tricky due to triangulation, but let's check if it exists
     assert(loaded.faceColors.size() == 1);
-    assert(std::abs(loaded.faceColors[0].x - 1.0f) < 0.01f);
+    assert(loaded.faceColors[0].r == 255);
 
     std::remove(filename.c_str());
     std::cout << "test_mesh_colors passed!" << std::endl;

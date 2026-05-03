@@ -27,7 +27,7 @@ AssemblyAnalyzer::Result AssemblyAnalyzer::analyzeClearance(float threshold) con
         Vec3 center = computeFaceCenter(part.vertices[part.triangles[i].v0], part.vertices[part.triangles[i].v1], part.vertices[part.triangles[i].v2]);
         Vec3 normal = computeFaceNormal(part.vertices[part.triangles[i].v0], part.vertices[part.triangles[i].v1], part.vertices[part.triangles[i].v2]);
         
-        if (envScene.isInside(center)) { res.colors[i] = {1,0,0}; return; }
+        if (envScene.isInside(center)) { res.colors[i] = {255, 0, 0, 255}; return; }
         
         Ray ray;
         ray.org = center;
@@ -35,10 +35,10 @@ AssemblyAnalyzer::Result AssemblyAnalyzer::analyzeClearance(float threshold) con
         ray.tnear = 0.0f;
         ray.tfar = threshold;
         
-        if (RayTracer::occluded(envScene, ray)) res.colors[i] = {1, 0.5f, 0};
-        else res.colors[i] = {0, 1, 0};
+        if (RayTracer::occluded(envScene, ray)) res.colors[i] = {255, 128, 0, 255};
+        else res.colors[i] = {0, 255, 0, 255};
     });
-    for(const auto& c : res.colors) { if(c.y == 0 && c.x == 1) res.collisions++; else if(c.y == 0.5f) res.violations++; }
+    for(const auto& c : res.colors) { if(c.g == 0 && c.r == 255) res.collisions++; else if(c.g == 128) res.violations++; }
     return res;
 }
 
@@ -53,15 +53,15 @@ AssemblyAnalyzer::Result AssemblyAnalyzer::verifyExtractionPath(Vec3 moveDir, fl
         ray.tnear = 0.0f;
         ray.tfar = distance;
         
-        if (RayTracer::occluded(envScene, ray)) { res.colors[i] = {1,0,0}; }
-        else res.colors[i] = {0,1,0};
+        if (RayTracer::occluded(envScene, ray)) { res.colors[i] = {255, 0, 0, 255}; }
+        else res.colors[i] = {0, 255, 0, 255};
     });
-    for(const auto& c : res.colors) if(c.x > 0.5f) res.collisions++;
+    for(const auto& c : res.colors) if(c.r > 128) res.collisions++;
     return res;
 }
 
-std::vector<Vec3> AssemblyAnalyzer::analyzeVisibility(Vec3 viewerPos) const {
-    std::vector<Vec3> colors(part.triangles.size());
+std::vector<Color4b> AssemblyAnalyzer::analyzeVisibility(Vec3 viewerPos) const {
+    std::vector<Color4b> colors(part.triangles.size());
     tbb::parallel_for(size_t(0), part.triangles.size(), [&](size_t i) {
         Vec3 center = computeFaceCenter(part.vertices[part.triangles[i].v0], part.vertices[part.triangles[i].v1], part.vertices[part.triangles[i].v2]);
         Vec3 dir = {center.x - viewerPos.x, center.y - viewerPos.y, center.z - viewerPos.z};
@@ -76,8 +76,8 @@ std::vector<Vec3> AssemblyAnalyzer::analyzeVisibility(Vec3 viewerPos) const {
         
         Hit hit = RayTracer::intersect(combinedScene, ray);
         
-        if (hit.hit && hit.geomID == 0 && std::abs(hit.t - dist) < dist * 0.05f) colors[i] = {0,1,0};
-        else colors[i] = {1,0,0};
+        if (hit.hit && hit.geomID == 0 && std::abs(hit.t - dist) < dist * 0.05f) colors[i] = {0, 255, 0, 255};
+        else colors[i] = {255, 0, 0, 255};
     });
     return colors;
 }

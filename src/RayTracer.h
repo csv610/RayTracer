@@ -4,7 +4,6 @@
 #include <vector>
 #include "mesh_utils.h"
 
-// Forward declaration to avoid exposing Embree headers in RayTracer.h
 struct RTCSceneTy;
 typedef struct RTCSceneTy* RTCScene;
 struct RTCDeviceTy;
@@ -22,7 +21,7 @@ struct Hit {
     float t = 1e10f;
     unsigned int geomID = -1;
     unsigned int primID = -1;
-    Vec3 normal; // Geometric normal
+    Vec3 normal;
 };
 
 class Scene {
@@ -31,12 +30,12 @@ public:
     ~Scene();
 
     unsigned int addMesh(const Mesh& mesh);
-    unsigned int addSharedMesh(const Mesh& mesh); // Use shared buffers
+    unsigned int addSharedMesh(const Mesh& mesh);
     void commit();
 
-    bool isInside(const Vec3& p) const;
+    bool isInside(const Vec3& p, const Vec3& dir = {0,0,1}) const;
+    int countIntersections(const Vec3& org, const Vec3& dir, float tmax) const;
     
-    // Low-level access if absolutely needed by internal src/ components
     RTCScene getInternalScene() const { return scene; }
     RTCDevice getInternalDevice() const { return device; }
 
@@ -51,4 +50,4 @@ public:
     static bool occluded(const Scene& scene, const Ray& ray);
 };
 
-#endif // RAY_TRACER_H
+#endif

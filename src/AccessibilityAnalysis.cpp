@@ -26,7 +26,7 @@ void AccessibilityAnalysis::analyze(float toolRadius) {
         Vec3 faceCenter = computeFaceCenter(mesh_.vertices[tri.v0], mesh_.vertices[tri.v1], mesh_.vertices[tri.v2]);
 
         if (normal.z < 0.05f) {
-            triColors_[i] = {1.0f, 0.0f, 0.0f}; // Red
+            triColors_[i] = {255, 0, 0, 255}; // Red
             return;
         }
 
@@ -54,13 +54,13 @@ void AccessibilityAnalysis::analyze(float toolRadius) {
         }
 
         if (accessible) {
-            triColors_[i] = {0.0f, 1.0f, 0.0f}; // Green
+            triColors_[i] = {0, 255, 0, 255}; // Green
         } else {
-            triColors_[i] = {1.0f, 0.0f, 0.0f}; // Red
+            triColors_[i] = {255, 0, 0, 255}; // Red
         }
     });
 
     for (const auto& c : triColors_) {
-        if (c.x > 0.5f) inaccessibleCount_++;
+        if (c.r > 128) inaccessibleCount_++;
     }
 }

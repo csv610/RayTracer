@@ -8,7 +8,7 @@
 class AssemblyAnalyzer {
 public:
     struct Result {
-        std::vector<Vec3> colors;
+        std::vector<Color4b> colors;
         int collisions = 0;
         int violations = 0;
         Mesh getColoredMesh(const Mesh& original) const {
@@ -23,7 +23,7 @@ public:
 
     Result analyzeClearance(float threshold) const;
     Result verifyExtractionPath(Vec3 moveDir, float distance) const;
-    std::vector<Vec3> analyzeVisibility(Vec3 viewerPos) const;
+    std::vector<Color4b> analyzeVisibility(Vec3 viewerPos) const;
 
 private:
     const Mesh& part;

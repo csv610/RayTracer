@@ -11,7 +11,7 @@ public:
     struct AnalysisResult {
         Vec3 p;
         float thickness;
-        Vec3 color; // Red-to-Green based on threshold
+        Color4b color;
     };
 
     StructuralCaliper(const Mesh& mesh);

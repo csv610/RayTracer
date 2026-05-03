@@ -2,6 +2,8 @@
 #include <embree4/rtcore.h>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
+#include <limits>
 
 Scene::Scene() {
     device = rtcNewDevice(nullptr);
@@ -39,27 +41,53 @@ void Scene::commit() {
     rtcCommitScene(scene);
 }
 
-bool Scene::isInside(const Vec3& p) const {
+int Scene::countIntersections(const Vec3& org, const Vec3& dir, float tmax) const {
     RTCRayHit rh;
-    rh.ray.org_x = p.x; rh.ray.org_y = p.y; rh.ray.org_z = p.z;
-    rh.ray.dir_x = 0.314f; rh.ray.dir_y = 0.718f; rh.ray.dir_z = 0.941f; // Arbitrary direction
-    float len = sqrt(rh.ray.dir_x*rh.ray.dir_x + rh.ray.dir_y*rh.ray.dir_y + rh.ray.dir_z*rh.ray.dir_z);
-    rh.ray.dir_x /= len; rh.ray.dir_y /= len; rh.ray.dir_z /= len;
-
-    rh.ray.tnear = 0.0f; rh.ray.tfar = 1e10f; rh.ray.mask = -1; rh.ray.time = 0;
+    rh.ray.org_x = org.x; rh.ray.org_y = org.y; rh.ray.org_z = org.z;
+    rh.ray.dir_x = dir.x; rh.ray.dir_y = dir.y; rh.ray.dir_z = dir.z;
+    rh.ray.tnear = 0.0f;
+    rh.ray.tfar = tmax;
+    rh.ray.mask = -1;
+    rh.ray.time = 0;
+    rh.ray.flags = 0;
     rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-    RTCIntersectArguments args; rtcInitIntersectArguments(&args);
+    
+    RTCIntersectArguments args; 
+    rtcInitIntersectArguments(&args);
     
     int intersections = 0;
     while (true) {
         rtcIntersect1(scene, &rh, &args);
         if (rh.hit.geomID == RTC_INVALID_GEOMETRY_ID) break;
+        
         intersections++;
-        rh.ray.tnear = rh.ray.tfar + 1e-4f;
-        rh.ray.tfar = 1e10f;
+        
+        // Robust advancement: use machine epsilon to step past hit
+        float hit_t = rh.ray.tfar;
+        rh.ray.tnear = hit_t + std::max(1e-6f, hit_t * 1e-6f);
+        rh.ray.tfar = tmax;
         rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+        
+        if (rh.ray.tnear >= tmax) break;
     }
-    return (intersections % 2 != 0);
+    return intersections;
+}
+
+bool Scene::isInside(const Vec3& p, const Vec3& dir) const {
+    RTCBounds bounds;
+    rtcGetSceneBounds(scene, &bounds);
+    if (bounds.lower_x > bounds.upper_x) return false;
+
+    // Use a very robust distance for "outside"
+    float maxDim = std::max({bounds.upper_x - bounds.lower_x, 
+                            bounds.upper_y - bounds.lower_y, 
+                            bounds.upper_z - bounds.lower_z});
+    float t_start = maxDim * 5.0f; 
+    
+    Vec3 org = { p.x - dir.x * t_start, p.y - dir.y * t_start, p.z - dir.z * t_start };
+    
+    // Count hits strictly before p
+    return (countIntersections(org, dir, t_start - 1e-5f) % 2 != 0);
 }
 
 Hit RayTracer::intersect(const Scene& scene, const Ray& ray) {
@@ -68,6 +96,7 @@ Hit RayTracer::intersect(const Scene& scene, const Ray& ray) {
     rh.ray.dir_x = ray.dir.x; rh.ray.dir_y = ray.dir.y; rh.ray.dir_z = ray.dir.z;
     rh.ray.tnear = ray.tnear; rh.ray.tfar = ray.tfar;
     rh.ray.mask = -1; rh.ray.time = 0;
+    rh.ray.flags = 0;
     rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
 
     RTCIntersectArguments args;
@@ -92,7 +121,7 @@ bool RayTracer::occluded(const Scene& scene, const Ray& ray) {
     r.org_x = ray.org.x; r.org_y = ray.org.y; r.org_z = ray.org.z;
     r.dir_x = ray.dir.x; r.dir_y = ray.dir.y; r.dir_z = ray.dir.z;
     r.tnear = ray.tnear; r.tfar = ray.tfar;
-    r.mask = -1; r.time = 0;
+    r.mask = -1; r.time = 0; r.flags = 0;
 
     RTCOccludedArguments args;
     rtcInitOccludedArguments(&args);

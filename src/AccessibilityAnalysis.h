@@ -13,13 +13,13 @@ public:
 
     void analyze(float toolRadius);
 
-    const std::vector<Vec3>& getTriColors() const { return triColors_; }
+    const std::vector<Color4b>& getTriColors() const { return triColors_; }
     int getInaccessibleCount() const { return inaccessibleCount_; }
 
 private:
     const Mesh& mesh_;
     Scene scene_;
-    std::vector<Vec3> triColors_;
+    std::vector<Color4b> triColors_;
     int inaccessibleCount_ = 0;
 };
 
