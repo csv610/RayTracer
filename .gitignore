@@ -2,3 +2,4 @@ build/
 *.off
 *.ply
 *.obj
+*.swp
