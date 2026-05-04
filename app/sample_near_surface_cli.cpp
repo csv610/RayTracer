@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 
     std::string inputFile = parser.get("input");
     int numSamples = parser.get_int("samples");
-    int side = parser.get_int("side", 0);
+    int side = parser.get_int("s", 0);
     std::string outputFile = parser.get("o");
 
     Mesh mesh;

@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
     std::string inputFileA = parser.get("part_a");
     std::string inputFileB = parser.get("part_b");
     std::string outputFile = parser.get("o");
-    float threshold = parser.get_float("threshold", 1.0f);
+    float threshold = parser.get_float("t", 1.0f);
 
     Mesh meshA, meshB;
     if (!MeshIO::load(inputFileA, meshA) || !MeshIO::load(inputFileB, meshB)) return 1;

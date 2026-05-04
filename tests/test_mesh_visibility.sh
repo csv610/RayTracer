@@ -1,17 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing mesh_visibility..."
-output=$(./build/mesh_visibility dataset/ter.off /tmp/mesh_visibility_test.off)
-echo "$output"
+./build/mesh_visibility $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Ray hits:"; then
-    if [ -f /tmp/mesh_visibility_test.off ]; then
-        echo "PASS: mesh_visibility"
-        exit 0
-    fi
+if [ -f "$OUTPUT" ]; then
+  exit 0
+else
+  exit 1
 fi
-echo "FAIL: mesh_visibility"
-exit 1

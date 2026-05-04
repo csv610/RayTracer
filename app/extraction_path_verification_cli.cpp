@@ -25,9 +25,9 @@ int main(int argc, char** argv) {
     std::string partFile = parser.get("part");
     std::string envFile = parser.get("environment");
     std::string outputFile = parser.get("o");
-    float dist = parser.get_float("distance", 100.0f);
+    float dist = parser.get_float("l", 100.0f);
     
-    std::string dirStr = parser.get("direction");
+    std::string dirStr = parser.get("d");
     if (dirStr.empty()) {
         std::cerr << "Error: --direction is required" << std::endl;
         return 1;

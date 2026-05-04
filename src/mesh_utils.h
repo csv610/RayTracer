@@ -79,7 +79,7 @@ inline Color4b getJetColor(float t) {
     float r = std::max(0.0f, std::min(1.0f, std::min(4.0f * t - 1.5f, -4.0f * t + 4.5f)));
     float g = std::max(0.0f, std::min(1.0f, std::min(4.0f * t - 0.5f, -4.0f * t + 3.5f)));
     float b = std::max(0.0f, std::min(1.0f, std::min(4.0f * t + 0.5f, -4.0f * t + 2.5f)));
-    return {(unsigned char)(r * 255.0f), (unsigned char)(g * 255.0f), (unsigned char)(b * 255.0f), 255};
+    return {(unsigned char)(std::round(r * 255.0f)), (unsigned char)(std::round(g * 255.0f)), (unsigned char)(std::round(b * 255.0f)), 255};
 }
 
 inline void createUVSphere(Mesh& mesh, int stacks, int slices, float radius) {

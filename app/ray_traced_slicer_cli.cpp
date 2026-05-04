@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
         "Slice mesh into layers for 3D printing using ray tracing.");
 
     parser.add_positional("input", "Input mesh file (OFF/PLY format)");
-    parser.add_positional("layers", "Number of layers to generate");
+    parser.add_argument("-l", "Number of layers (default: 10)", "10");
     parser.add_argument("-r", "Slicing resolution (default: 128)", "128");
     parser.add_argument("-o", "Output file prefix (default: slice)", "slice");
 
@@ -20,9 +20,9 @@ int main(int argc, char** argv) {
     }
 
     std::string inputFile = parser.get("input");
-    int layers = parser.get_int("layers");
-    int res = parser.get_int("resolution", 128);
-    std::string prefix = parser.get("prefix");
+    int layers = parser.get_int("l", 10);
+    int res = parser.get_int("r", 128);
+    std::string prefix = parser.get("o");
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

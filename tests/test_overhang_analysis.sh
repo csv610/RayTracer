@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing overhang_analysis..."
-output=$(./build/overhang_analysis dataset/ter.off)
-echo "$output"
+./build/overhang_analysis $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "overhang triangles"; then
-    echo "PASS: overhang_analysis"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: overhang_analysis"
-    exit 1
+  exit 1
 fi

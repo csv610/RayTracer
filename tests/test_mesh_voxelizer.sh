@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing mesh_voxelizer..."
-output=$(./build/mesh_voxelizer dataset/ter.off 16)
-echo "$output"
+./build/mesh_voxelizer $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Voxelization saved to"; then
-    echo "PASS: mesh_voxelizer"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: mesh_voxelizer"
-    exit 1
+  exit 1
 fi

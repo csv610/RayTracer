@@ -1,16 +1,13 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing mass_properties..."
-output=$(./build/mass_properties dataset/ter.off 64)
-echo "$output"
+RESULT=$(./build/mass_properties $INPUT -o $OUTPUT)
+echo "$RESULT"
 
-if echo "$output" | grep -q "Volume:"; then
-    echo "PASS: mass_properties"
-    exit 0
+if echo "$RESULT" | grep -q "Volume:"; then
+  exit 0
 else
-    echo "FAIL: mass_properties"
-    exit 1
+  exit 1
 fi

@@ -1,17 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing shadow_plane..."
-output=$(./build/shadow_plane dataset/ter.off /tmp/shadow_test.ppm)
-echo "$output"
+./build/shadow_plane $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Saved to"; then
-    if [ -f /tmp/shadow_test.ppm ]; then
-        echo "PASS: shadow_plane"
-        exit 0
-    fi
+if [ -f "$OUTPUT" ]; then
+  exit 0
+else
+  exit 1
 fi
-echo "FAIL: shadow_plane"
-exit 1

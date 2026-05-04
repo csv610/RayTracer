@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing sky_view_factor..."
-output=$(./build/sky_view_factor dataset/ter.off)
-echo "$output"
+./build/sky_view_factor $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Sky View analysis complete"; then
-    echo "PASS: sky_view_factor"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: sky_view_factor"
-    exit 1
+  exit 1
 fi

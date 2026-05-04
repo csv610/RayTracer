@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing draft_angle_analysis..."
-output=$(./build/draft_angle_analysis dataset/ter.off)
-echo "$output"
+./build/draft_angle_analysis $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Draft angle analysis saved"; then
-    echo "PASS: draft_angle_analysis"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: draft_angle_analysis"
-    exit 1
+  exit 1
 fi

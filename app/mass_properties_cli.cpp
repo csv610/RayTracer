@@ -11,6 +11,7 @@ int main(int argc, char** argv) {
     parser.add_positional("input", "Input mesh file (OFF/PLY format)");
     parser.add_argument("-r", "Ray cast resolution (default: 128)", "128");
     parser.add_argument("-d", "Material density (default: 1.0)", "1.0");
+    parser.add_argument("-o", "Output file (optional)", "");
 
     try {
         parser.parse(argc, argv);
@@ -27,8 +28,8 @@ int main(int argc, char** argv) {
     }
     std::cerr << "CLI: Loaded " << mesh.vertices.size() << " vertices and " << mesh.triangles.size() << " triangles" << std::endl;
 
-    int res = parser.get_int("resolution", 128);
-    float density = parser.get_float("density", 1.0f);
+    int res = parser.get_int("r", 128);
+    float density = parser.get_float("d", 1.0f);
 
     PhysicalProperties analyzer(mesh);
     auto p = analyzer.compute(res);

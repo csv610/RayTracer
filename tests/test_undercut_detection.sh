@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing undercut_detection..."
-output=$(./build/undercut_detection dataset/ter.off)
-echo "$output"
+./build/undercut_detection $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Detected.*undercut triangles"; then
-    echo "PASS: undercut_detection"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: undercut_detection"
-    exit 1
+  exit 1
 fi

@@ -1,16 +1,13 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing optimal_parting_line..."
-output=$(./build/optimal_parting_line dataset/ter.off)
-echo "$output"
+RESULT=$(./build/optimal_parting_line $INPUT -o $OUTPUT)
+echo "$RESULT"
 
-if echo "$output" | grep -q "Optimal Pull Direction:"; then
-    echo "PASS: optimal_parting_line"
-    exit 0
+if echo "$RESULT" | grep -q "Optimal Pull Direction:"; then
+  exit 0
 else
-    echo "FAIL: optimal_parting_line"
-    exit 1
+  exit 1
 fi

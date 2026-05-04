@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
     }
 
     std::string inputFile = parser.get("input");
-    int res = parser.get_int("resolution", 32);
+    int res = parser.get_int("r", 32);
     std::string outputFile = parser.get("o");
 
     Mesh mesh;

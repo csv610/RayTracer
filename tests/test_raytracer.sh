@@ -1,17 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing raytracer..."
-output=$(./build/raytracer dataset/ter.off /tmp/raytracer_test.ppm)
-echo "$output"
+./build/raytracer $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Saved to"; then
-    if [ -f /tmp/raytracer_test.ppm ]; then
-        echo "PASS: raytracer"
-        exit 0
-    fi
+if [ -f "$OUTPUT" ]; then
+  exit 0
+else
+  exit 1
 fi
-echo "FAIL: raytracer"
-exit 1

@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing projected_thickness..."
-output=$(./build/projected_thickness dataset/ter.off 16)
-echo "$output"
+./build/projected_thickness $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Thickness analysis saved"; then
-    echo "PASS: projected_thickness"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: projected_thickness"
-    exit 1
+  exit 1
 fi

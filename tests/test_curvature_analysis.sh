@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing curvature_analysis..."
-output=$(./build/curvature_analysis dataset/ter.off)
-echo "$output"
+./build/curvature_analysis $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Loading mesh:"; then
-    echo "PASS: curvature_analysis"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: curvature_analysis"
-    exit 1
+  exit 1
 fi

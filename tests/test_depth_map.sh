@@ -1,17 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing depth_map..."
-output=$(./build/depth_map dataset/ter.off /tmp/depth_test.ppm)
-echo "$output"
+./build/depth_map $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Depth map saved to"; then
-    if [ -f /tmp/depth_test.ppm ]; then
-        echo "PASS: depth_map"
-        exit 0
-    fi
+if [ -f "$OUTPUT" ]; then
+  exit 0
+else
+  exit 1
 fi
-echo "FAIL: depth_map"
-exit 1

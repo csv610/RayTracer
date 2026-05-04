@@ -11,6 +11,7 @@ int main(int argc, char** argv) {
     parser.add_positional("input", "Input mesh file (OFF/PLY format)");
     parser.add_argument("-n", "Number of candidate orientations to evaluate (default: 32)", "32");
     parser.add_argument("-t", "Number of top results to display (default: 5)", "5");
+    parser.add_argument("-o", "Output mesh file (optional)", "");
 
     try {
         parser.parse(argc, argv);
@@ -20,8 +21,8 @@ int main(int argc, char** argv) {
     }
 
     std::string inputFile = parser.get("input");
-    int samples = parser.get_int("samples", 32);
-    int topN = parser.get_int("top", 5);
+    int samples = parser.get_int("n", 32);
+    int topN = parser.get_int("t", 5);
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

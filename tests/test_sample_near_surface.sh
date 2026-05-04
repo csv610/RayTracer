@@ -1,17 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing sample_near_surface..."
-output=$(./build/sample_near_surface dataset/ter.off 100 1 /tmp/sample_surface_test.off)
-echo "$output"
+./build/sample_near_surface $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Successfully saved"; then
-    if [ -f /tmp/sample_surface_test.off ]; then
-        echo "PASS: sample_near_surface"
-        exit 0
-    fi
+if [ -f "$OUTPUT" ]; then
+  exit 0
+else
+  exit 1
 fi
-echo "FAIL: sample_near_surface"
-exit 1

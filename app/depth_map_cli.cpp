@@ -26,8 +26,8 @@ int main(int argc, char** argv) {
 
     std::string inputFile = parser.get("input");
     std::string outputFile = parser.get("o");
-    int width = parser.get_int("width", 800);
-    int height = parser.get_int("height", 600);
+    int width = parser.get_int("w", 800);
+    int height = parser.get_int("H", 600);
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

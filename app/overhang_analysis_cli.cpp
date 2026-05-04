@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 
     std::string inputFile = parser.get("input");
     std::string outputFile = parser.get("o");
-    float threshold = parser.get_float("threshold", 45.0f);
+    float threshold = parser.get_float("t", 45.0f);
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

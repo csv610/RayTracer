@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
 
     std::string inputFile = parser.get("input");
     std::string outputFile = parser.get("o");
-    int res = parser.get_int("resolution", 64);
+    int res = parser.get_int("r", 64);
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

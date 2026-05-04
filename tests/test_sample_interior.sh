@@ -1,17 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing sample_interior..."
-output=$(./build/sample_interior dataset/ter.off 100 /tmp/sample_interior_test.off)
-echo "$output"
+./build/sample_interior $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Successfully saved"; then
-    if [ -f /tmp/sample_interior_test.off ]; then
-        echo "PASS: sample_interior"
-        exit 0
-    fi
+if [ -f "$OUTPUT" ]; then
+  exit 0
+else
+  exit 1
 fi
-echo "FAIL: sample_interior"
-exit 1

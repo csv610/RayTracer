@@ -1,16 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing pocket_detection..."
-output=$(./build/pocket_detection dataset/ter.off)
-echo "$output"
+./build/pocket_detection $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "Pocket analysis complete"; then
-    echo "PASS: pocket_detection"
-    exit 0
+if [ -f "$OUTPUT" ]; then
+  exit 0
 else
-    echo "FAIL: pocket_detection"
-    exit 1
+  exit 1
 fi

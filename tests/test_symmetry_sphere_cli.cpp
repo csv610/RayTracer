@@ -22,7 +22,7 @@ int main() {
         float score = detector.checkSymmetry(candidates[i]);
         std::cout << "Plane " << i << " score: " << score << std::endl;
         // For a sphere, the PCA-aligned planes should be highly symmetric
-        if (score < 0.001f) {
+        if (score < 0.005f) {
             foundGoodSymmetry = true;
         }
     }

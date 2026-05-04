@@ -1,17 +1,12 @@
 #!/bin/bash
-set -e
-
 cd "$(dirname "$0")/.."
+INPUT="dataset/ter.off"
+OUTPUT="/tmp/test_$(basename $0 .sh).off"
 
-echo "Testing cnc_toolpath_sim..."
-output=$(./build/cnc_toolpath_sim dataset/ter.off 16 2.0 /tmp/cnc_test.off)
-echo "$output"
+./build/cnc_toolpath_sim $INPUT  -o $OUTPUT
 
-if echo "$output" | grep -q "CNC simulation saved to"; then
-    if [ -f /tmp/cnc_test.off ]; then
-        echo "PASS: cnc_toolpath_sim"
-        exit 0
-    fi
+if [ -f "$OUTPUT" ]; then
+  exit 0
+else
+  exit 1
 fi
-echo "FAIL: cnc_toolpath_sim"
-exit 1

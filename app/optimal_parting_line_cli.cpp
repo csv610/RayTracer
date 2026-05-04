@@ -9,6 +9,7 @@ int main(int argc, char** argv) {
 
     parser.add_positional("input", "Input mesh file (OFF/PLY format)");
     parser.add_argument("-n", "Number of sampling directions (default: 64)", "64");
+    parser.add_argument("-o", "Output file (optional)", "");
 
     try {
         parser.parse(argc, argv);
@@ -18,7 +19,7 @@ int main(int argc, char** argv) {
     }
 
     std::string inputFile = parser.get("input");
-    int samples = parser.get_int("samples", 64);
+    int samples = parser.get_int("n", 64);
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

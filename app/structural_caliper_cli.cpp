@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
 
     std::string inputFile = parser.get("input");
     std::string outputFile = parser.get("o");
-    int numSamples = parser.get_int("samples", 100000);
+    int numSamples = parser.get_int("n", 100000);
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

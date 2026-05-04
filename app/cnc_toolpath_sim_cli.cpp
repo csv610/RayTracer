@@ -22,8 +22,8 @@ int main(int argc, char** argv) {
 
     std::string inputFile = parser.get("input");
     std::string outputFile = parser.get("o");
-    int res = parser.get_int("resolution", 128);
-    float toolR = parser.get_float("tool-radius", 2.0f);
+    int res = parser.get_int("r", 128);
+    float toolR = parser.get_float("R", 2.0f);
 
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;

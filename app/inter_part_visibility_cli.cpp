@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
     std::string envFile = parser.get("environment");
     std::string outputFile = parser.get("o");
     
-    std::string dirStr = parser.get("direction");
+    std::string dirStr = parser.get("d");
     if (dirStr.empty()) {
         std::cerr << "Error: --direction is required" << std::endl;
         return 1;

@@ -122,6 +122,9 @@ add_executable(sample_near_surface app/sample_near_surface_cli.cpp src/SampleSur
 target_link_libraries(sample_near_surface PRIVATE embree TBB::tbb assimp::assimp)
 
 # Unit Tests
+add_executable(gen_test_data tests/gen_test_data.cpp src/MeshIO.cpp)
+target_link_libraries(gen_test_data PRIVATE assimp::assimp)
+
 add_executable(test_mesh_utils src/test_mesh_utils.cpp src/MeshIO.cpp)
 target_link_libraries(test_mesh_utils PRIVATE assimp::assimp)
 add_executable(test_mass_sphere tests/test_mass_sphere_cli.cpp src/MeshIO.cpp)
@@ -131,6 +134,9 @@ target_link_libraries(test_symmetry_sphere PRIVATE embree TBB::tbb assimp::assim
 
 add_executable(test_apps tests/test_apps.cpp ${ANALYSIS_SOURCES})
 target_link_libraries(test_apps PRIVATE embree TBB::tbb assimp::assimp)
+
+add_executable(test_kernel_cli app/test_kernel_cli.cpp ${ANALYSIS_SOURCES})
+target_link_libraries(test_kernel_cli PRIVATE embree TBB::tbb assimp::assimp)
 
 # Visualization
 add_executable(shape_diameter_vis app/shape_diameter_vis_cli.cpp src/MeshIO.cpp src/RayTracer.cpp src/ShapeDiameter.cpp)
@@ -146,8 +152,21 @@ target_include_directories(mesh_slicer_viewer PRIVATE /Users/csv610/Projects/Mes
 target_link_libraries(mesh_slicer_viewer PRIVATE embree Qt6::Widgets Qt6::Xml Qt6::OpenGLWidgets OpenGL::GL assimp::assimp TBB::tbb /Users/csv610/Projects/Mesh/libQGLViewer/QGLViewer/libQGLViewer.dylib)
 
 enable_testing()
+
+# Generate test data first
+add_test(NAME GenTestData COMMAND gen_test_data)
+set_tests_properties(GenTestData PROPERTIES FIXTURES_SETUP TestData)
+
 add_test(NAME MeshUtilsTest COMMAND test_mesh_utils)
 add_test(NAME AppsTest COMMAND test_apps)
+add_test(NAME MassSphereTest COMMAND test_mass_sphere)
+add_test(NAME SymmetrySphereTest COMMAND test_symmetry_sphere)
+add_test(NAME KernelTest COMMAND test_kernel_cli)
 
-add_executable(test_kernel_cli app/test_kernel_cli.cpp ${ANALYSIS_SOURCES})
-target_link_libraries(test_kernel_cli PRIVATE embree TBB::tbb assimp::assimp)
+# Functional tests (shell scripts)
+file(GLOB TEST_SCRIPTS tests/*.sh)
+foreach(script ${TEST_SCRIPTS})
+    get_filename_component(script_name ${script} NAME_WE)
+    add_test(NAME ${script_name} COMMAND bash ${script})
+    set_tests_properties(${script_name} PROPERTIES FIXTURES_REQUIRED TestData)
+endforeach()
