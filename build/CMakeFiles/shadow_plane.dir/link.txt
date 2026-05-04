@@ -1,1 +1,0 @@
-/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/shadow_plane.dir/app/shadow_plane.cpp.o -o shadow_plane  -Wl,-rpath,/opt/homebrew/lib /opt/homebrew/lib/libembree4.4.dylib
