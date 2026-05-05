@@ -1,4 +1,4 @@
-#include "GeometryAnalyzer.h"
+#include "AmbientOcclusion.h"
 #include "MeshIO.h"
 #include "argparse/argparse.h"
 #include <iostream>
@@ -27,12 +27,12 @@ int main(int argc, char** argv) {
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;
 
-    GeometryAnalyzer analyzer(mesh);
-    auto ao = analyzer.computeAmbientOcclusion(samples);
+    AmbientOcclusion ao(mesh);
+    auto results = ao.compute(samples);
 
-    mesh.faceColors.resize(ao.size());
-    for(size_t i = 0; i < ao.size(); ++i) {
-        unsigned char c = (unsigned char)(ao[i] * 255.0f);
+    mesh.faceColors.resize(results.size());
+    for(size_t i = 0; i < results.size(); ++i) {
+        unsigned char c = (unsigned char)(results[i] * 255.0f);
         mesh.faceColors[i] = {c, c, c, 255};
     }
     

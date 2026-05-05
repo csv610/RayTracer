@@ -39,9 +39,15 @@ public:
     /**
      * @brief Performs the feature detection analysis.
      * @param numRays Number of rays per node for hemispherical probing (default 32).
-     * @param searchRadius Max distance to search for features (relative to mesh size).
+     * @param searchScale Max distance to search for features (relative to mesh size).
      */
     Result detectFeatures(int numRays = 32, float searchScale = 0.1f) const;
+
+    /**
+     * @brief Computes exposure values specifically for detected pocket regions.
+     * @return Vector of exposure values per node. Non-pocket nodes will have 1.0 (full exposure).
+     */
+    std::vector<float> computePocketExposure(int samples = 64) const;
 
 private:
     const Mesh& m_mesh;

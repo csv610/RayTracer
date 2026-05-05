@@ -1,4 +1,4 @@
-#include "GeometryAnalyzer.h"
+#include "CADFeatureDetector.h"
 #include "MeshIO.h"
 #include "argparse/argparse.h"
 #include <iostream>
@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
 
     parser.add_positional("input", "Input mesh file (OFF/PLY format)");
     parser.add_argument("-o", "Output mesh file (default: pockets.off)", "pockets.off");
-    parser.add_argument("-n", "Number of ray samples per face (default: 64)", "64");
+    parser.add_argument("-n", "Number of ray samples per node (default: 64)", "64");
 
     try {
         parser.parse(argc, argv);
@@ -27,12 +27,14 @@ int main(int argc, char** argv) {
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;
 
-    GeometryAnalyzer analyzer(mesh);
-    auto exposure = analyzer.computePocketExposure(samples);
+    CADFeatureDetector detector(mesh);
+    auto nodeExposure = detector.computePocketExposure(samples);
 
-    mesh.faceColors.resize(exposure.size());
-    for(size_t i = 0; i < exposure.size(); ++i) {
-        unsigned char c = (unsigned char)(exposure[i] * 255.0f);
+    mesh.faceColors.resize(mesh.triangles.size());
+    for(size_t i = 0; i < mesh.triangles.size(); ++i) {
+        const auto& tri = mesh.triangles[i];
+        float avgExp = (nodeExposure[tri.v0] + nodeExposure[tri.v1] + nodeExposure[tri.v2]) / 3.0f;
+        unsigned char c = (unsigned char)(avgExp * 255.0f);
         mesh.faceColors[i] = {c, c, c, 255};
     }
     

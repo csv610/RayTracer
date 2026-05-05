@@ -1,4 +1,4 @@
-#include "GeometryAnalyzer.h"
+#include "SkyViewFactor.h"
 #include "MeshIO.h"
 #include "argparse/argparse.h"
 #include <iostream>
@@ -27,12 +27,12 @@ int main(int argc, char** argv) {
     Mesh mesh;
     if (!MeshIO::load(inputFile, mesh)) return 1;
 
-    GeometryAnalyzer analyzer(mesh);
-    auto skyView = analyzer.computeSkyViewFactor(samples);
+    SkyViewFactor svf(mesh);
+    auto results = svf.compute(samples);
 
-    mesh.faceColors.resize(skyView.size());
-    for(size_t i = 0; i < skyView.size(); ++i) {
-        unsigned char c = (unsigned char)(skyView[i] * 255.0f);
+    mesh.faceColors.resize(results.size());
+    for(size_t i = 0; i < results.size(); ++i) {
+        unsigned char c = (unsigned char)(results[i] * 255.0f);
         mesh.faceColors[i] = {0, 0, c, 255};
     }
     
