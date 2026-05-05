@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     mesh.faceColors.resize(skyView.size());
     for(size_t i = 0; i < skyView.size(); ++i) {
         unsigned char c = (unsigned char)(skyView[i] * 255.0f);
-        mesh.faceColors[i] = {c, c, c, 255};
+        mesh.faceColors[i] = {0, 0, c, 255};
     }
     
     MeshIO::save(outputFile, mesh);
