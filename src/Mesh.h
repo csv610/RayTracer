@@ -7,6 +7,15 @@
 #include <fstream>
 #include <algorithm>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+namespace MeshConstants {
+    constexpr float EpsilonScale = 1e-4f;
+    constexpr float RayLengthScale = 2.0f;
+}
+
 /**
  * @file Mesh.h
  * @brief Core geometric structures for the mesh processing engine.
