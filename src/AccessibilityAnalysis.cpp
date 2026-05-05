@@ -1,4 +1,5 @@
 #include "AccessibilityAnalysis.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_for.h>
 #include <cstring>
 #include <cmath>
@@ -11,9 +12,10 @@ AccessibilityAnalysis::AccessibilityAnalysis(const Mesh& mesh) : mesh_(mesh) {
 AccessibilityAnalysis::~AccessibilityAnalysis() {}
 
 void AccessibilityAnalysis::analyze(float toolRadius) {
-    Vertex center;
+    Node center;
     float meshRadius;
-    computeBoundingSphere(mesh_, center, meshRadius);
+    MeshGeometry geom(mesh_);
+    geom.computeBoundingSphere(center, meshRadius);
     float rayLength = meshRadius * 4.0f;
     float epsilon = meshRadius * 1e-4f;
 
@@ -22,8 +24,8 @@ void AccessibilityAnalysis::analyze(float toolRadius) {
 
     tbb::parallel_for(size_t(0), mesh_.triangles.size(), [&](size_t i) {
         const Triangle& tri = mesh_.triangles[i];
-        Vec3 normal = computeFaceNormal(mesh_.vertices[tri.v0], mesh_.vertices[tri.v1], mesh_.vertices[tri.v2]);
-        Vec3 faceCenter = computeFaceCenter(mesh_.vertices[tri.v0], mesh_.vertices[tri.v1], mesh_.vertices[tri.v2]);
+        Vec3 normal = MeshGeometry::computeFaceNormal(mesh_.nodes[tri.v0], mesh_.nodes[tri.v1], mesh_.nodes[tri.v2]);
+        Vec3 faceCenter = MeshGeometry::computeFaceCenter(mesh_.nodes[tri.v0], mesh_.nodes[tri.v1], mesh_.nodes[tri.v2]);
 
         if (normal.z < 0.05f) {
             triColors_[i] = {255, 0, 0, 255}; // Red

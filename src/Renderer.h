@@ -4,6 +4,17 @@
 #include "RayTracer.h"
 #include <vector>
 
+/**
+ * @class Renderer
+ * @brief A ray-tracing based visualization engine for 3D scenes.
+ * 
+ * Renderer provides functionality to transform 3D scenes into 2D image 
+ * representations. It supports generating normal maps (surface orientation), 
+ * depth maps (distance from camera), and simple shaded renders using 
+ * basic lighting models. 
+ * 
+ * It uses a pinhole camera model and is highly parallelized for performance.
+ */
 class Renderer {
 public:
     struct Camera {

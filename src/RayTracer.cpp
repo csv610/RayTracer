@@ -17,8 +17,8 @@ Scene::~Scene() {
 
 unsigned int Scene::addMesh(const Mesh& mesh) {
     RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
+    Node* vb = (Node*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Node), mesh.nodes.size());
+    memcpy(vb, mesh.nodes.data(), mesh.nodes.size() * sizeof(Node));
     Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
     memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
     rtcCommitGeometry(geom);
@@ -29,7 +29,7 @@ unsigned int Scene::addMesh(const Mesh& mesh) {
 
 unsigned int Scene::addSharedMesh(const Mesh& mesh) {
     RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    rtcSetSharedGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, mesh.vertices.data(), 0, sizeof(Vertex), mesh.vertices.size());
+    rtcSetSharedGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, mesh.nodes.data(), 0, sizeof(Node), mesh.nodes.size());
     rtcSetSharedGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, mesh.triangles.data(), 0, sizeof(Triangle), mesh.triangles.size());
     rtcCommitGeometry(geom);
     unsigned int geomID = rtcAttachGeometry(scene, geom);
@@ -71,6 +71,37 @@ int Scene::countIntersections(const Vec3& org, const Vec3& dir, float tmax) cons
         if (rh.ray.tnear >= tmax) break;
     }
     return intersections;
+}
+
+std::vector<float> Scene::findAllIntersections(const Vec3& org, const Vec3& dir, float tmax) const {
+    std::vector<float> hits;
+    RTCRayHit rh;
+    rh.ray.org_x = org.x; rh.ray.org_y = org.y; rh.ray.org_z = org.z;
+    rh.ray.dir_x = dir.x; rh.ray.dir_y = dir.y; rh.ray.dir_z = dir.z;
+    rh.ray.tnear = 0.0f;
+    rh.ray.tfar = tmax;
+    rh.ray.mask = -1;
+    rh.ray.time = 0;
+    rh.ray.flags = 0;
+    rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+    
+    RTCIntersectArguments args; 
+    rtcInitIntersectArguments(&args);
+    
+    while (true) {
+        rtcIntersect1(scene, &rh, &args);
+        if (rh.hit.geomID == RTC_INVALID_GEOMETRY_ID) break;
+        
+        hits.push_back(rh.ray.tfar);
+        
+        float hit_t = rh.ray.tfar;
+        rh.ray.tnear = hit_t + std::max(1e-6f, hit_t * 1e-6f);
+        rh.ray.tfar = tmax;
+        rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+        
+        if (rh.ray.tnear >= tmax) break;
+    }
+    return hits;
 }
 
 bool Scene::isInside(const Vec3& p, const Vec3& dir) const {

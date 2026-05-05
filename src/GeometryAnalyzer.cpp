@@ -9,10 +9,8 @@ GeometryAnalyzer::GeometryAnalyzer(const Mesh& mesh) : mesh(mesh) {
     device = rtcNewDevice(nullptr);
     scene = rtcNewScene(device);
     buildScene();
-    AABB bbox;
-    for (const auto& v : mesh.vertices) bbox.expand(v);
-    Vec3 size = bbox.size();
-    meshDiag = sqrt(size.x*size.x + size.y*size.y + size.z*size.z);
+    MeshGeometry geom(mesh);
+    meshDiag = geom.computeAABB().size().length();
 }
 
 GeometryAnalyzer::~GeometryAnalyzer() {
@@ -22,13 +20,18 @@ GeometryAnalyzer::~GeometryAnalyzer() {
 
 void GeometryAnalyzer::buildScene() {
     RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
+    Node* vb = (Node*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Node), mesh.nodes.size());
+    memcpy(vb, mesh.nodes.data(), mesh.nodes.size() * sizeof(Node));
     Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
     memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
     rtcCommitGeometry(geom);
     rtcAttachGeometry(scene, geom);
     rtcCommitScene(scene);
+}
+
+MeshGeometry::Curvature GeometryAnalyzer::analyzeCurvature() const {
+    MeshGeometry geom(mesh);
+    return geom.computeCurvature();
 }
 
 std::vector<float> GeometryAnalyzer::runHemisphericalSampling(int samples, bool invert) const {
@@ -37,8 +40,8 @@ std::vector<float> GeometryAnalyzer::runHemisphericalSampling(int samples, bool 
     float rayLength = meshDiag * 2.0f;
 
     tbb::parallel_for(size_t(0), mesh.triangles.size(), [&](size_t i) {
-        Vec3 normal = computeFaceNormal(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
-        Vec3 center = computeFaceCenter(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
+        Vec3 normal = MeshGeometry::computeFaceNormal(mesh.nodes[mesh.triangles[i].v0], mesh.nodes[mesh.triangles[i].v1], mesh.nodes[mesh.triangles[i].v2]);
+        Vec3 center = MeshGeometry::computeFaceCenter(mesh.nodes[mesh.triangles[i].v0], mesh.nodes[mesh.triangles[i].v1], mesh.nodes[mesh.triangles[i].v2]);
 
         Vec3 up = (std::abs(normal.z) < 0.9f) ? Vec3{0, 0, 1} : Vec3{1, 0, 0};
         Vec3 tangent = {normal.y * up.z - normal.z * up.y, normal.z * up.x - normal.x * up.z, normal.x * up.y - normal.y * up.x};

@@ -1,10 +1,19 @@
 #ifndef MESH_IO_H
 #define MESH_IO_H
 
-#include "mesh_utils.h"
+#include "Mesh.h"
 #include <string>
 #include <vector>
 
+/**
+ * @class MeshIO
+ * @brief Static utility class for mesh input and output operations.
+ * 
+ * MeshIO provides a unified interface for loading and saving 3D meshes in 
+ * multiple formats (PLY, OFF, etc.). It features custom optimized loaders 
+ * for common formats and integrates the Assimp library for broader 
+ * compatibility with standard CAD and 3D graphics files.
+ */
 class MeshIO {
 public:
     static bool load(const std::string& filename, Mesh& mesh);

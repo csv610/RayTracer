@@ -1,4 +1,5 @@
 #include "ShapeDiameter.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_for.h>
 #include <algorithm>
 #include <stdexcept>
@@ -32,9 +33,9 @@ void ShapeDiameter::computeForFace(int triIdx, std::vector<RayHit>& hits, int nu
     if (triIdx < 0 || triIdx >= (int)mesh.triangles.size()) return;
 
     const Triangle& tri = mesh.triangles[triIdx];
-    Vec3 normal = computeFaceNormal(mesh.vertices[tri.v0], mesh.vertices[tri.v1], mesh.vertices[tri.v2]);
+    Vec3 normal = MeshGeometry::computeFaceNormal(mesh.nodes[tri.v0], mesh.nodes[tri.v1], mesh.nodes[tri.v2]);
     Vec3 inwardNormal = {-normal.x, -normal.y, -normal.z};
-    Vec3 faceCenter = computeFaceCenter(mesh.vertices[tri.v0], mesh.vertices[tri.v1], mesh.vertices[tri.v2]);
+    Vec3 faceCenter = MeshGeometry::computeFaceCenter(mesh.nodes[tri.v0], mesh.nodes[tri.v1], mesh.nodes[tri.v2]);
 
     Vec3 up = (std::abs(inwardNormal.z) < 0.9f) ? Vec3{0, 0, 1} : Vec3{1, 0, 0};
     Vec3 tangent = {inwardNormal.y * up.z - inwardNormal.z * up.y,
@@ -50,9 +51,9 @@ void ShapeDiameter::computeForFace(int triIdx, std::vector<RayHit>& hits, int nu
     for (int i = 0; i < numTheta; ++i) {
         for (int j = 0; j < numPhi; ++j) {
             float theta = coneAngle * (i + 0.5f) / numTheta; 
-            float phi = 2.0f * M_PI * (j + 0.5f) / numPhi;
-            float sinT = sin(theta); float cosT = cos(theta);
-            float sinP = sin(phi);   float cosP = cos(phi);
+            float phi = 2.0f * (float)M_PI * (j + 0.5f) / numPhi;
+            float sinT = std::sin(theta); float cosT = std::cos(theta);
+            float sinP = std::sin(phi);   float cosP = std::cos(phi);
             Vec3 rayDir = {
                 (tangent.x * cosP + bitangent.x * sinP) * sinT + inwardNormal.x * cosT,
                 (tangent.y * cosP + bitangent.y * sinP) * sinT + inwardNormal.y * cosT,

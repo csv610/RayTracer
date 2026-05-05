@@ -1,10 +1,21 @@
 #ifndef ASSEMBLY_ANALYZER_H
 #define ASSEMBLY_ANALYZER_H
 
-#include "mesh_utils.h"
+#include "Mesh.h"
 #include "RayTracer.h"
 #include <vector>
 
+/**
+ * @class AssemblyAnalyzer
+ * @brief Analyzes geometric relationships between assembly components.
+ * 
+ * This class provides tools for evaluating clearance between parts, verifying
+ * extraction paths for disassembly, and determining the visibility of
+ * components from specific viewpoints.
+ * 
+ * It leverages ray-tracing to detect collisions and distance violations
+ * between a part and its surrounding environment.
+ */
 class AssemblyAnalyzer {
 public:
     struct Result {

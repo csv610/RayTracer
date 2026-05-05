@@ -1,43 +1,36 @@
 #include "SymmetryDetector.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <iostream>
 #include <algorithm>
-#include <cstring>
 #include <cmath>
 
-SymmetryDetector::SymmetryDetector(const Mesh& mesh) : mesh(mesh) {
-    buildScene();
+SymmetryDetector::SymmetryDetector(const Mesh& mesh) : m_mesh(mesh) {
+    m_scene.addSharedMesh(m_mesh);
+    m_scene.commit();
 
-    AABB bbox;
-    for (const auto& v : mesh.vertices) bbox.expand(v);
-    meshDiagonal = bbox.size().length();
+    MeshGeometry geom(m_mesh);
+    m_meshDiagonal = geom.computeAABB().size().length();
     
     preSample(10000);
 }
 
-SymmetryDetector::~SymmetryDetector() {}
-
-void SymmetryDetector::buildScene() {
-    scene.addSharedMesh(mesh);
-    scene.commit();
-}
-
 void SymmetryDetector::preSample(int numSamples) {
-    SampleSurface sampler(mesh);
-    preSampledPoints = sampler.sample(numSamples);
+    SampleSurfacePoints sampler(m_mesh);
+    m_preSampledPoints = sampler.sample(numSamples);
 }
 
 float SymmetryDetector::checkSymmetry(const Plane& plane) const {
-    float epsilon = meshDiagonal * 0.001f;
+    float epsilon = m_meshDiagonal * 0.001f;
     
     float totalError = tbb::parallel_reduce(
-        tbb::blocked_range<size_t>(0, preSampledPoints.size()),
+        tbb::blocked_range<size_t>(0, m_preSampledPoints.size()),
         0.0f,
         [&](const tbb::blocked_range<size_t>& r, float init) -> float {
             float localError = init;
             for (size_t i = r.begin(); i != r.end(); ++i) {
-                const auto& sp = preSampledPoints[i];
+                const auto& sp = m_preSampledPoints[i];
                 Vec3 p_ref = plane.reflectPoint(sp.p);
                 Vec3 n_ref = plane.reflectVector(sp.n);
 
@@ -47,14 +40,14 @@ float SymmetryDetector::checkSymmetry(const Plane& plane) const {
                 ray.tnear = 0.0f;
                 ray.tfar = epsilon * 10.0f;
 
-                Hit hit = RayTracer::intersect(scene, ray);
+                Hit hit = RayTracer::intersect(m_scene, ray);
 
                 if (hit.hit) {
                     localError += std::abs(hit.t - epsilon);
                 } else {
                     ray.org = {p_ref.x - n_ref.x * epsilon, p_ref.y - n_ref.y * epsilon, p_ref.z - n_ref.z * epsilon};
                     ray.dir = {n_ref.x, n_ref.y, n_ref.z};
-                    hit = RayTracer::intersect(scene, ray);
+                    hit = RayTracer::intersect(m_scene, ray);
                     
                     if (hit.hit) {
                         localError += std::abs(hit.t - epsilon);
@@ -68,10 +61,10 @@ float SymmetryDetector::checkSymmetry(const Plane& plane) const {
         std::plus<float>()
     );
 
-    return totalError / (preSampledPoints.size() * meshDiagonal);
+    return totalError / (m_preSampledPoints.size() * m_meshDiagonal);
 }
 
-void eigenSolveSymmetric3x3(float m[3][3], float eigenvalues[3], Vec3 eigenvectors[3]) {
+static void eigenSolveSymmetric3x3(float m[3][3], float eigenvalues[3], Vec3 eigenvectors[3]) {
     float p1 = m[0][1]*m[0][1] + m[0][2]*m[0][2] + m[1][2]*m[1][2];
     if (p1 == 0) {
         eigenvalues[0] = m[0][0]; eigenvalues[1] = m[1][1]; eigenvalues[2] = m[2][2];
@@ -79,8 +72,8 @@ void eigenSolveSymmetric3x3(float m[3][3], float eigenvalues[3], Vec3 eigenvecto
         return;
     }
     float q = (m[0][0] + m[1][1] + m[2][2]) / 3.0f;
-    float p2 = pow(m[0][0]-q, 2) + pow(m[1][1]-q, 2) + pow(m[2][2]-q, 2) + 2*p1;
-    float p = sqrt(p2 / 6.0f);
+    float p2 = std::pow(m[0][0]-q, 2) + std::pow(m[1][1]-q, 2) + std::pow(m[2][2]-q, 2) + 2*p1;
+    float p = std::sqrt(p2 / 6.0f);
     float B[3][3];
     float invP = 1.0f / p;
     for(int i=0; i<3; ++i) for(int j=0; j<3; ++j) {
@@ -131,13 +124,13 @@ void eigenSolveSymmetric3x3(float m[3][3], float eigenvalues[3], Vec3 eigenvecto
 
 std::vector<Plane> SymmetryDetector::findCandidatePlanes() const {
     Vec3 mean = {0,0,0};
-    for (const auto& s : preSampledPoints) {
+    for (const auto& s : m_preSampledPoints) {
         mean.x += s.p.x; mean.y += s.p.y; mean.z += s.p.z;
     }
-    mean.x /= preSampledPoints.size(); mean.y /= preSampledPoints.size(); mean.z /= preSampledPoints.size();
+    mean.x /= m_preSampledPoints.size(); mean.y /= m_preSampledPoints.size(); mean.z /= m_preSampledPoints.size();
 
     float cov[3][3] = {0};
-    for (const auto& s : preSampledPoints) {
+    for (const auto& s : m_preSampledPoints) {
         float dx = s.p.x - mean.x;
         float dy = s.p.y - mean.y;
         float dz = s.p.z - mean.z;
@@ -146,7 +139,7 @@ std::vector<Plane> SymmetryDetector::findCandidatePlanes() const {
         cov[2][2] += dz*dz;
     }
     cov[1][0] = cov[0][1]; cov[2][0] = cov[0][2]; cov[2][1] = cov[1][2];
-    for(int i=0; i<3; ++i) for(int j=0; j<3; ++j) cov[i][j] /= preSampledPoints.size();
+    for(int i=0; i<3; ++i) for(int j=0; j<3; ++j) cov[i][j] /= m_preSampledPoints.size();
 
     float eigenvalues[3];
     Vec3 eigenvectors[3];

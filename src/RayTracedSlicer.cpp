@@ -1,22 +1,23 @@
 #include "RayTracedSlicer.h"
-#include "InsideOutsideKernel.h"
+#include "MeshPointClassifier.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_for.h>
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 
 RayTracedSlicer::RayTracedSlicer(const Mesh& mesh) : m_mesh(mesh) {
     m_scene.addSharedMesh(m_mesh);
     m_scene.commit();
-    for (const auto& v : m_mesh.vertices) {
-        m_bbox.expand(v);
-    }
+    MeshGeometry geom(m_mesh);
+    m_bbox = geom.computeAABB();
     m_bbox.pad(0.005f); // 1% total expansion
 }
 
 SlicerLayer RayTracedSlicer::computeLayer(int layerIdx, int numLayers, int resolution, SliceAxis axis) {
     SlicerLayer layer;
-    if (m_mesh.vertices.empty() || m_mesh.triangles.empty()) return layer;
+    if (m_mesh.nodes.empty() || m_mesh.triangles.empty()) return layer;
 
     Vec3 size = m_bbox.size();
     float range, minPos;
@@ -69,12 +70,12 @@ SlicerLayer RayTracedSlicer::computeLayer(int layerIdx, int numLayers, int resol
     layer.texWidth = gridU;
     layer.texHeight = gridV;
     layer.textureData.resize(gridU * gridV * 3, 40);
-    layer.vertices.resize(gridU * gridV);
-    layer.vertexColors.resize(gridU * gridV);
+    layer.nodes.resize(gridU * gridV);
+    layer.nodeColors.resize(gridU * gridV);
     layer.raySources.resize(gridU * gridV);
 
-    // Instantiate kernel (cached per layer compute for efficiency)
-    InsideOutsideKernel kernel(m_mesh);
+    // Instantiate classifier (cached per layer compute for efficiency)
+    MeshPointClassifier classifier(m_mesh);
 
     tbb::parallel_for(0, gridV, [&](int v) {
         for (int u = 0; u < gridU; ++u) {
@@ -91,7 +92,7 @@ SlicerLayer RayTracedSlicer::computeLayer(int layerIdx, int numLayers, int resol
             };
 
             int idx = v * gridU + u;
-            layer.vertices[idx] = {p.x, p.y, p.z};
+            layer.nodes[idx] = {p.x, p.y, p.z};
             
             float visOffset = 2.0f;
             layer.raySources[idx] = {
@@ -104,10 +105,10 @@ SlicerLayer RayTracedSlicer::computeLayer(int layerIdx, int numLayers, int resol
             if (axis == SliceAxis::X) color = {255, 0, 0, 255};
             else if (axis == SliceAxis::Y) color = {0, 255, 0, 255};
             else color = {0, 0, 255, 255};
-            layer.vertexColors[idx] = color;
+            layer.nodeColors[idx] = color;
 
-            // Use the Kernel for foolproof Inside/Outside/Surface classification
-            int status = kernel.classify(p);
+            // Use the Classifier for foolproof Inside/Outside/Surface classification
+            int status = classifier.classify(p);
             
             int texIdx = idx * 3;
             if (status <= 0) { // Inside (-1) or On Surface (0)
@@ -137,4 +138,20 @@ SlicerLayer RayTracedSlicer::computeLayer(int layerIdx, int numLayers, int resol
     }
 
     return layer;
+}
+
+void RayTracedSlicer::sliceBatch(int numLayers, int res, const std::string& prefix) const {
+    for (int l = 0; l < numLayers; ++l) {
+        SlicerLayer layer = const_cast<RayTracedSlicer*>(this)->computeLayer(l, numLayers, res, SliceAxis::Z);
+
+        if (l % std::max(1, numLayers / 5) == 0) {
+            std::string filename = prefix + "_" + std::to_string(l) + ".ppm";
+            std::ofstream out(filename, std::ios::binary);
+            if (out) {
+                out << "P6\n" << layer.texWidth << " " << layer.texHeight << "\n255\n";
+                out.write((char*)layer.textureData.data(), layer.textureData.size());
+                std::cout << "Saved slice: " << filename << std::endl;
+            }
+        }
+    }
 }

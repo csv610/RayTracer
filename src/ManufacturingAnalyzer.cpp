@@ -1,4 +1,5 @@
 #include "ManufacturingAnalyzer.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <iostream>
@@ -8,11 +9,8 @@
 
 ManufacturingAnalyzer::ManufacturingAnalyzer(const Mesh& mesh) : mesh(mesh) {
     buildScene();
-
-    AABB bbox;
-    for (const auto& v : mesh.vertices) bbox.expand(v);
-    Vec3 size = bbox.size();
-    meshDiag = sqrt(size.x*size.x + size.y*size.y + size.z*size.z);
+    MeshGeometry geom(mesh);
+    meshDiag = geom.computeAABB().size().length();
 }
 
 ManufacturingAnalyzer::~ManufacturingAnalyzer() {}
@@ -34,8 +32,8 @@ ManufacturingAnalyzer::Result ManufacturingAnalyzer::analyzeUndercuts(Vec3 pullD
             int localCount = init;
             for (size_t i = r.begin(); i != r.end(); ++i) {
                 const auto& tri = mesh.triangles[i];
-                Vec3 normal = computeFaceNormal(mesh.vertices[tri.v0], mesh.vertices[tri.v1], mesh.vertices[tri.v2]);
-                Vec3 faceCenter = computeFaceCenter(mesh.vertices[tri.v0], mesh.vertices[tri.v1], mesh.vertices[tri.v2]);
+                Vec3 normal = MeshGeometry::computeFaceNormal(mesh.nodes[tri.v0], mesh.nodes[tri.v1], mesh.nodes[tri.v2]);
+                Vec3 faceCenter = MeshGeometry::computeFaceCenter(mesh.nodes[tri.v0], mesh.nodes[tri.v1], mesh.nodes[tri.v2]);
 
                 float dot = normal.x * pullDir.x + normal.y * pullDir.y + normal.z * pullDir.z;
                 bool undercut = false;
@@ -74,7 +72,7 @@ ManufacturingAnalyzer::Result ManufacturingAnalyzer::analyzeOverhangs(float thre
         [&](const tbb::blocked_range<size_t>& r, int init) -> int {
             int localCount = init;
             for (size_t i = r.begin(); i != r.end(); ++i) {
-                Vec3 normal = computeFaceNormal(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
+                Vec3 normal = MeshGeometry::computeFaceNormal(mesh.nodes[mesh.triangles[i].v0], mesh.nodes[mesh.triangles[i].v1], mesh.nodes[mesh.triangles[i].v2]);
                 if (normal.z < criticalCos) {
                     float t = std::clamp((normal.z - (-1.0f)) / (criticalCos - (-1.0f)), 0.0f, 1.0f);
                     res.colors[i] = {(unsigned char)(255.0f), (unsigned char)(t * 255.0f), 0, 255}; localCount++;
@@ -93,7 +91,7 @@ ManufacturingAnalyzer::Result ManufacturingAnalyzer::analyzeDraftAngles(Vec3 pul
     Result res;
     res.colors.resize(mesh.triangles.size());
     for (size_t i = 0; i < mesh.triangles.size(); ++i) {
-        Vec3 normal = computeFaceNormal(mesh.vertices[mesh.triangles[i].v0], mesh.vertices[mesh.triangles[i].v1], mesh.vertices[mesh.triangles[i].v2]);
+        Vec3 normal = MeshGeometry::computeFaceNormal(mesh.nodes[mesh.triangles[i].v0], mesh.nodes[mesh.triangles[i].v1], mesh.nodes[mesh.triangles[i].v2]);
         float dot = std::clamp(normal.x * pullDir.x + normal.y * pullDir.y + normal.z * pullDir.z, -1.0f, 1.0f);
         float angleDeg = (M_PI * 0.5f - acos(dot)) * 180.0f / M_PI;
         if (angleDeg < -0.1f) res.colors[i] = {255, 0, 0, 255};

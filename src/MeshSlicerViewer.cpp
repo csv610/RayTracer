@@ -1,12 +1,14 @@
 #include "MeshSlicerViewer.h"
 #include "MeshIO.h"
+#include "ImageUtils.h"
+#include "MeshGeometry.h"
 #include <SDL2/SDL.h>
 #include <cstdio>
 #include <iostream>
 
 MeshSlicerViewer::MeshSlicerViewer()
     : m_resolution(512)
-    , m_direction(MeshSlicer::SLICE_Y)
+    , m_axis(SliceAxis::Y)
     , m_currentSlice(0)
     , m_totalSlices(100)
     , m_dirty(true)
@@ -14,7 +16,11 @@ MeshSlicerViewer::MeshSlicerViewer()
 }
 
 bool MeshSlicerViewer::loadMesh(const char* filename) {
-    return MeshIO::load(filename, m_mesh);
+    if (MeshIO::load(filename, m_mesh)) {
+        m_slicer = std::make_unique<RayTracedSlicer>(m_mesh);
+        return true;
+    }
+    return false;
 }
 
 void MeshSlicerViewer::setResolution(int res) {
@@ -22,39 +28,46 @@ void MeshSlicerViewer::setResolution(int res) {
     m_dirty = true;
 }
 
-void MeshSlicerViewer::setDirection(MeshSlicer::SliceDirection dir) {
-    m_direction = dir;
+void MeshSlicerViewer::setAxis(SliceAxis axis) {
+    m_axis = axis;
     m_currentSlice = 0;
     m_dirty = true;
 }
 
 void MeshSlicerViewer::saveCurrentSlice() {
-    float pos = MeshSlicer::getSlicePosition(m_mesh, m_direction, m_currentSlice, m_totalSlices);
-    Plane plane = MeshSlicer::createPlane(m_direction, pos);
+    if (!m_slicer) return;
+    
+    SlicerLayer layer = m_slicer->computeLayer(m_currentSlice, m_totalSlices, m_resolution, m_axis);
     std::string filename = getOutputFilename();
-    MeshSlicer::saveSlicePNG(m_mesh, plane, filename.c_str(), m_resolution);
-    std::cout << "Saved: " << filename << std::endl;
+    
+    if (ImageUtils::savePNG(filename.c_str(), layer.texWidth, layer.texHeight, layer.textureData.data())) {
+        std::cout << "Saved: " << filename << std::endl;
+    } else {
+        std::cerr << "Failed to save: " << filename << std::endl;
+    }
 }
 
 std::string MeshSlicerViewer::getOutputFilename() const {
     char buf[256];
-    const char* dirName[] = {"X", "Y", "Z"};
-    snprintf(buf, sizeof(buf), "slice_%s_%03d.png", dirName[m_direction], m_currentSlice);
+    const char* axisName[] = {"X", "Y", "Z"};
+    snprintf(buf, sizeof(buf), "slice_%s_%03d.png", axisName[(int)m_axis], m_currentSlice);
     return std::string(buf);
 }
 
 void MeshSlicerViewer::run() {
-    if (m_mesh.vertices.empty()) {
-        std::cerr << "No mesh loaded!" << std::endl;
+    if (m_mesh.nodes.empty() || !m_slicer) {
+        std::cerr << "No mesh loaded or slicer not initialized!" << std::endl;
         return;
     }
 
-    AABB bbox = MeshSlicer::computeBoundingBox(m_mesh);
+    MeshGeometry geom(m_mesh);
+    AABB bbox = geom.computeAABB();
+    Vec3 size = bbox.size();
     float extent = 0;
-    switch (m_direction) {
-        case MeshSlicer::SLICE_X: extent = bbox.max.x - bbox.min.x; break;
-        case MeshSlicer::SLICE_Y: extent = bbox.max.y - bbox.min.y; break;
-        case MeshSlicer::SLICE_Z: extent = bbox.max.z - bbox.min.z; break;
+    switch (m_axis) {
+        case SliceAxis::X: extent = size.x; break;
+        case SliceAxis::Y: extent = size.y; break;
+        case SliceAxis::Z: extent = size.z; break;
     }
     m_totalSlices = (int)(extent * 10) + 1;
     if (m_totalSlices < 10) m_totalSlices = 10;
@@ -66,7 +79,7 @@ void MeshSlicerViewer::run() {
     }
 
     SDL_Window* window = SDL_CreateWindow(
-        "Mesh Slicer - n:next p:prev s:save q:quit 1-3:axis",
+        "Ray Traced Slicer - n:next p:prev s:save q:quit 1-3:axis",
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
         m_resolution,
@@ -88,22 +101,18 @@ void MeshSlicerViewer::run() {
 
     while (running) {
         if (m_dirty) {
-            float pos = MeshSlicer::getSlicePosition(m_mesh, m_direction, m_currentSlice, m_totalSlices);
-            Plane plane = MeshSlicer::createPlane(m_direction, pos);
-
-            int w, h;
-            std::vector<unsigned char> pixels = MeshSlicer::renderSlice(m_mesh, plane, m_resolution, w, h);
+            SlicerLayer layer = m_slicer->computeLayer(m_currentSlice, m_totalSlices, m_resolution, m_axis);
 
             if (texture) SDL_DestroyTexture(texture);
 
-            if (w > 0 && h > 0 && !pixels.empty()) {
-                texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, w, h);
-                SDL_UpdateTexture(texture, NULL, pixels.data(), w * 3);
+            if (layer.texWidth > 0 && layer.texHeight > 0 && !layer.textureData.empty()) {
+                texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, layer.texWidth, layer.texHeight);
+                SDL_UpdateTexture(texture, NULL, layer.textureData.data(), layer.texWidth * 3);
 
                 char title[256];
                 const char* axisName[] = {"X", "Y", "Z"};
-                snprintf(title, sizeof(title), "Slice %d/%d (%s-axis, pos=%.2f)",
-                         m_currentSlice, m_totalSlices, axisName[m_direction], pos);
+                snprintf(title, sizeof(title), "Slice %d/%d (%s-axis, z=%.2f)",
+                         m_currentSlice, m_totalSlices, axisName[(int)m_axis], layer.z);
                 SDL_SetWindowTitle(window, title);
 
                 SDL_RenderClear(renderer);
@@ -137,13 +146,13 @@ void MeshSlicerViewer::run() {
                         running = false;
                         break;
                     case SDLK_1:
-                        setDirection(MeshSlicer::SLICE_X);
+                        setAxis(SliceAxis::X);
                         break;
                     case SDLK_2:
-                        setDirection(MeshSlicer::SLICE_Y);
+                        setAxis(SliceAxis::Y);
                         break;
                     case SDLK_3:
-                        setDirection(MeshSlicer::SLICE_Z);
+                        setAxis(SliceAxis::Z);
                         break;
                     default:
                         break;
@@ -164,8 +173,8 @@ void MeshSlicerViewer::run() {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cout << "Usage: " << argv[0] << " <mesh.off> [resolution] [direction]" << std::endl;
-        std::cout << "  direction: 0=X, 1=Y (default), 2=Z" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <mesh.off> [resolution] [axis]" << std::endl;
+        std::cout << "  axis: 0=X, 1=Y (default), 2=Z" << std::endl;
         std::cout << "Controls: n=next p=prev s=save q=quit 1-3=change axis" << std::endl;
         return 1;
     }
@@ -181,9 +190,9 @@ int main(int argc, char* argv[]) {
     viewer.setResolution(res);
 
     if (argc >= 4) {
-        int dir = std::atoi(argv[3]);
-        if (dir == 0) viewer.setDirection(MeshSlicer::SLICE_X);
-        else if (dir == 2) viewer.setDirection(MeshSlicer::SLICE_Z);
+        int axis = std::atoi(argv[3]);
+        if (axis == 0) viewer.setAxis(SliceAxis::X);
+        else if (axis == 2) viewer.setAxis(SliceAxis::Z);
     }
 
     viewer.run();

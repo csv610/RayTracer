@@ -1,10 +1,21 @@
 #ifndef MANUFACTURING_ANALYZER_H
 #define MANUFACTURING_ANALYZER_H
 
-#include "mesh_utils.h"
+#include "Mesh.h"
 #include "RayTracer.h"
 #include <vector>
 
+/**
+ * @class ManufacturingAnalyzer
+ * @brief Evaluates mesh geometry for manufacturing feasibility and constraints.
+ * 
+ * This class identifies features critical for processes like injection molding,
+ * casting, and 3D printing. It detects undercuts (occlusions along a pull direction),
+ * overhangs (steep downward faces), and insufficient draft angles.
+ * 
+ * It can also suggest an optimal parting line by sampling various orientations
+ * to find the direction with minimal undercuts.
+ */
 class ManufacturingAnalyzer {
 public:
     struct Result {

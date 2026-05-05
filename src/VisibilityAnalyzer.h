@@ -2,9 +2,17 @@
 #define VISIBILITY_ANALYZER_H
 
 #include <vector>
-#include "mesh_utils.h"
+#include "Mesh.h"
 #include "RayTracer.h"
 
+/**
+ * @class VisibilityAnalyzer
+ * @brief Evaluates the line-of-sight visibility of mesh faces.
+ * 
+ * This class determines if faces are visible from the exterior by sampling 
+ * rays over a hemisphere around each face normal. It uses ray tracing to 
+ * detect if any sample ray can escape the mesh bounding volume without occlusion.
+ */
 class VisibilityAnalyzer {
 public:
     struct Result {

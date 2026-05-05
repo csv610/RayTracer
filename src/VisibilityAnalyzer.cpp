@@ -1,11 +1,13 @@
 #include "VisibilityAnalyzer.h"
+#include "MeshGeometry.h"
 #include <cmath>
 #include <algorithm>
 
 VisibilityAnalyzer::VisibilityAnalyzer(const Mesh& mesh) : mesh(mesh) {
     buildScene();
-    Vertex center;
-    computeBoundingSphere(mesh, center, sphereRadius);
+    Node center;
+    MeshGeometry geom(mesh);
+    geom.computeBoundingSphere(center, sphereRadius);
 }
 
 VisibilityAnalyzer::~VisibilityAnalyzer() {}
@@ -22,8 +24,8 @@ VisibilityAnalyzer::Result VisibilityAnalyzer::computeVisibility(int numTheta, i
 
     for (size_t triIdx = 0; triIdx < mesh.triangles.size(); ++triIdx) {
         const Triangle& tri = mesh.triangles[triIdx];
-        Vec3 normal = computeFaceNormal(mesh.vertices[tri.v0], mesh.vertices[tri.v1], mesh.vertices[tri.v2]);
-        Vec3 faceCenter = computeFaceCenter(mesh.vertices[tri.v0], mesh.vertices[tri.v1], mesh.vertices[tri.v2]);
+        Vec3 normal = MeshGeometry::computeFaceNormal(mesh.nodes[tri.v0], mesh.nodes[tri.v1], mesh.nodes[tri.v2]);
+        Vec3 faceCenter = MeshGeometry::computeFaceCenter(mesh.nodes[tri.v0], mesh.nodes[tri.v1], mesh.nodes[tri.v2]);
 
         Vec3 up = (std::abs(normal.z) < 0.9f) ? Vec3{0, 0, 1} : Vec3{1, 0, 0};
         Vec3 tangent = {normal.y * up.z - normal.z * up.y, normal.z * up.x - normal.x * up.z, normal.x * up.y - normal.y * up.x};
@@ -34,12 +36,12 @@ VisibilityAnalyzer::Result VisibilityAnalyzer::computeVisibility(int numTheta, i
         bool isVisible = false;
         for (int i = 0; i < numTheta; ++i) {
             for (int j = 0; j < numPhi; ++j) {
-                float theta = M_PI * 0.5f * (i + 0.5f) / numTheta;
-                float phi = 2.0f * M_PI * (j + 0.5f) / numPhi;
+                float theta = (float)M_PI * 0.5f * (i + 0.5f) / numTheta;
+                float phi = 2.0f * (float)M_PI * (j + 0.5f) / numPhi;
                 Vec3 rayDir = {
-                    (tangent.x * cos(phi) + bitangent.x * sin(phi)) * sin(theta) + normal.x * cos(theta),
-                    (tangent.y * cos(phi) + bitangent.y * sin(phi)) * sin(theta) + normal.y * cos(theta),
-                    (tangent.z * cos(phi) + bitangent.z * sin(phi)) * sin(theta) + normal.z * cos(theta)
+                    (tangent.x * std::cos(phi) + bitangent.x * std::sin(phi)) * std::sin(theta) + normal.x * std::cos(theta),
+                    (tangent.y * std::cos(phi) + bitangent.y * std::sin(phi)) * std::sin(theta) + normal.y * std::cos(theta),
+                    (tangent.z * std::cos(phi) + bitangent.z * std::sin(phi)) * std::sin(theta) + normal.z * std::cos(theta)
                 };
 
                 Ray ray;

@@ -9,7 +9,7 @@
 #include <algorithm>
 
 bool MeshIO::load(const std::string& filename, Mesh& mesh) {
-    mesh.vertices.clear();
+    mesh.nodes.clear();
     mesh.triangles.clear();
 
     std::string ext = "";
@@ -20,7 +20,7 @@ bool MeshIO::load(const std::string& filename, Mesh& mesh) {
         if (readPLY(filename, mesh)) return true;
         std::cerr << "Custom PLY loader failed, falling back to Assimp..." << std::endl;
     } else if (ext == "off") {
-        if (readOFF(filename, mesh)) { std::cerr << "Custom OFF read succeeded. vertices=" << mesh.vertices.size() << " triangles=" << mesh.triangles.size() << std::endl; return true; }
+        if (readOFF(filename, mesh)) { std::cerr << "Custom OFF read succeeded. nodes=" << mesh.nodes.size() << " triangles=" << mesh.triangles.size() << std::endl; return true; }
         std::cerr << "Custom OFF loader failed, falling back to Assimp..." << std::endl;
     }
 
@@ -45,9 +45,9 @@ bool MeshIO::readOFF(const std::string& filename, Mesh& mesh) {
         if (!(file >> nTris >> nEdges)) return false;
     }
     
-    mesh.vertices.resize(nVerts);
+    mesh.nodes.resize(nVerts);
     for (int i = 0; i < nVerts; ++i) {
-        if (!(file >> mesh.vertices[i].x >> mesh.vertices[i].y >> mesh.vertices[i].z)) return false;
+        if (!(file >> mesh.nodes[i].x >> mesh.nodes[i].y >> mesh.nodes[i].z)) return false;
     }
     mesh.triangles.resize(nTris);
     for (int i = 0; i < nTris; ++i) {
@@ -67,7 +67,7 @@ bool MeshIO::readPLY(const std::string& filename, Mesh& mesh) {
     struct Property { std::string type; std::string name; int size; };
     struct Element {
         std::string name; int count; std::vector<Property> props;
-        bool isVertex = false; bool isFace = false; bool isTristrip = false;
+        bool isNode = false; bool isFace = false; bool isTristrip = false;
     };
     std::vector<Element> elements;
     bool binary = false;
@@ -86,7 +86,7 @@ bool MeshIO::readPLY(const std::string& filename, Mesh& mesh) {
             std::stringstream ss(line); std::string tmp, name; int count;
             ss >> tmp >> name >> count;
             Element e; e.name = name; e.count = count;
-            if (name == "vertex") e.isVertex = true;
+            if (name == "vertex") e.isNode = true;
             else if (name == "face") e.isFace = true;
             else if (name == "tristrips") e.isTristrip = true;
             elements.push_back(e);
@@ -106,28 +106,28 @@ bool MeshIO::readPLY(const std::string& filename, Mesh& mesh) {
     if (!binary) return false;
 
     for (const auto& e : elements) {
-        if (e.isVertex) {
-            mesh.vertices.resize(e.count);
+        if (e.isNode) {
+            mesh.nodes.resize(e.count);
             bool hasColor = false;
             for (const auto& p : e.props) if (p.name == "red" || p.name == "diffuse_red") hasColor = true;
-            if (hasColor) mesh.vertexColors.resize(e.count);
+            if (hasColor) mesh.nodeColors.resize(e.count);
 
             for (int i = 0; i < e.count; ++i) {
                 for (const auto& p : e.props) {
-                    if (p.name == "x") file.read((char*)&mesh.vertices[i].x, 4);
-                    else if (p.name == "y") file.read((char*)&mesh.vertices[i].y, 4);
-                    else if (p.name == "z") file.read((char*)&mesh.vertices[i].z, 4);
+                    if (p.name == "x") file.read((char*)&mesh.nodes[i].x, 4);
+                    else if (p.name == "y") file.read((char*)&mesh.nodes[i].y, 4);
+                    else if (p.name == "z") file.read((char*)&mesh.nodes[i].z, 4);
                     else if (p.name == "red" || p.name == "diffuse_red") {
-                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.vertexColors[i].r = c; }
-                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.vertexColors[i].r = (unsigned char)(std::clamp(c, 0.0f, 1.0f) * 255.0f); }
+                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.nodeColors[i].r = c; }
+                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.nodeColors[i].r = (unsigned char)(std::clamp(c, 0.0f, 1.0f) * 255.0f); }
                     }
                     else if (p.name == "green" || p.name == "diffuse_green") {
-                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.vertexColors[i].g = c; }
-                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.vertexColors[i].g = (unsigned char)(std::clamp(c, 0.0f, 1.0f) * 255.0f); }
+                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.nodeColors[i].g = c; }
+                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.nodeColors[i].g = (unsigned char)(std::clamp(c, 0.0f, 1.0f) * 255.0f); }
                     }
                     else if (p.name == "blue" || p.name == "diffuse_blue") {
-                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.vertexColors[i].b = c; }
-                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.vertexColors[i].b = (unsigned char)(std::clamp(c, 0.0f, 1.0f) * 255.0f); }
+                        if (p.size == 1) { unsigned char c; file.read((char*)&c, 1); mesh.nodeColors[i].b = c; }
+                        else if (p.size == 4) { float c; file.read((char*)&c, 4); mesh.nodeColors[i].b = (unsigned char)(std::clamp(c, 0.0f, 1.0f) * 255.0f); }
                     }
                     else file.seekg(p.size, std::ios::cur);
                 }
@@ -194,18 +194,18 @@ bool MeshIO::writePLY(const std::string& filename, const Mesh& mesh) {
 
     out << "ply\n";
     out << "format binary_little_endian 1.0\n";
-    out << "element vertex " << mesh.vertices.size() << "\n";
+    out << "element vertex " << mesh.nodes.size() << "\n";
     out << "property float x\n";
     out << "property float y\n";
     out << "property float z\n";
-    bool hasNormals = mesh.vertexNormals.size() == mesh.vertices.size();
+    bool hasNormals = mesh.nodeNormals.size() == mesh.nodes.size();
     if (hasNormals) {
         out << "property float nx\n";
         out << "property float ny\n";
         out << "property float nz\n";
     }
-    bool hasVertexColors = mesh.vertexColors.size() == mesh.vertices.size();
-    if (hasVertexColors) {
+    bool hasNodeColors = mesh.nodeColors.size() == mesh.nodes.size();
+    if (hasNodeColors) {
         out << "property uchar red\n";
         out << "property uchar green\n";
         out << "property uchar blue\n";
@@ -220,19 +220,19 @@ bool MeshIO::writePLY(const std::string& filename, const Mesh& mesh) {
     }
     out << "end_header\n";
 
-    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-        out.write((char*)&mesh.vertices[i].x, 4);
-        out.write((char*)&mesh.vertices[i].y, 4);
-        out.write((char*)&mesh.vertices[i].z, 4);
+    for (size_t i = 0; i < mesh.nodes.size(); ++i) {
+        out.write((char*)&mesh.nodes[i].x, 4);
+        out.write((char*)&mesh.nodes[i].y, 4);
+        out.write((char*)&mesh.nodes[i].z, 4);
         if (hasNormals) {
-            out.write((char*)&mesh.vertexNormals[i].x, 4);
-            out.write((char*)&mesh.vertexNormals[i].y, 4);
-            out.write((char*)&mesh.vertexNormals[i].z, 4);
+            out.write((char*)&mesh.nodeNormals[i].x, 4);
+            out.write((char*)&mesh.nodeNormals[i].y, 4);
+            out.write((char*)&mesh.nodeNormals[i].z, 4);
         }
-        if (hasVertexColors) {
-            out.write((char*)&mesh.vertexColors[i].r, 1);
-            out.write((char*)&mesh.vertexColors[i].g, 1);
-            out.write((char*)&mesh.vertexColors[i].b, 1);
+        if (hasNodeColors) {
+            out.write((char*)&mesh.nodeColors[i].r, 1);
+            out.write((char*)&mesh.nodeColors[i].g, 1);
+            out.write((char*)&mesh.nodeColors[i].b, 1);
         }
     }
 
@@ -261,9 +261,9 @@ bool MeshIO::loadWithAssimp(const std::string& filename, Mesh& mesh) {
     }
     for (unsigned int i = 0; i < aiS->mNumMeshes; ++i) {
         aiMesh* m = aiS->mMeshes[i];
-        unsigned int offset = mesh.vertices.size();
+        unsigned int offset = mesh.nodes.size();
         for (unsigned int j = 0; j < m->mNumVertices; ++j) {
-            mesh.vertices.push_back({m->mVertices[j].x, m->mVertices[j].y, m->mVertices[j].z});
+            mesh.nodes.push_back({m->mVertices[j].x, m->mVertices[j].y, m->mVertices[j].z});
         }
         for (unsigned int j = 0; j < m->mNumFaces; ++j) {
             if (m->mFaces[j].mNumIndices == 3)
@@ -285,24 +285,24 @@ bool MeshIO::save(const std::string& filename, const Mesh& mesh) {
     std::ofstream out(filename);
     if (!out) return false;
 
-    bool hasNormals = mesh.vertexNormals.size() == mesh.vertices.size();
-    bool hasVertexColors = mesh.vertexColors.size() == mesh.vertices.size();
+    bool hasNormals = mesh.nodeNormals.size() == mesh.nodes.size();
+    bool hasNodeColors = mesh.nodeColors.size() == mesh.nodes.size();
     bool hasFaceColors = mesh.faceColors.size() == mesh.triangles.size();
 
-    if (hasNormals && hasVertexColors) out << "CNOFF\n";
+    if (hasNormals && hasNodeColors) out << "CNOFF\n";
     else if (hasNormals) out << "NOFF\n";
-    else if (hasVertexColors) out << "COFF\n";
+    else if (hasNodeColors) out << "COFF\n";
     else out << "OFF\n";
 
-    out << mesh.vertices.size() << " " << mesh.triangles.size() << " 0\n";
+    out << mesh.nodes.size() << " " << mesh.triangles.size() << " 0\n";
     
-    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-        out << mesh.vertices[i].x << " " << mesh.vertices[i].y << " " << mesh.vertices[i].z;
+    for (size_t i = 0; i < mesh.nodes.size(); ++i) {
+        out << mesh.nodes[i].x << " " << mesh.nodes[i].y << " " << mesh.nodes[i].z;
         if (hasNormals) {
-            out << " " << mesh.vertexNormals[i].x << " " << mesh.vertexNormals[i].y << " " << mesh.vertexNormals[i].z;
+            out << " " << mesh.nodeNormals[i].x << " " << mesh.nodeNormals[i].y << " " << mesh.nodeNormals[i].z;
         }
-        if (hasVertexColors) {
-            out << " " << (int)mesh.vertexColors[i].r << " " << (int)mesh.vertexColors[i].g << " " << (int)mesh.vertexColors[i].b << " 255";
+        if (hasNodeColors) {
+            out << " " << (int)mesh.nodeColors[i].r << " " << (int)mesh.nodeColors[i].g << " " << (int)mesh.nodeColors[i].b << " 255";
         }
         out << "\n";
     }

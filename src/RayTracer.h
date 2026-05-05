@@ -2,7 +2,7 @@
 #define RAY_TRACER_H
 
 #include <vector>
-#include "mesh_utils.h"
+#include "Mesh.h"
 
 struct RTCSceneTy;
 typedef struct RTCSceneTy* RTCScene;
@@ -24,6 +24,15 @@ struct Hit {
     Vec3 normal;
 };
 
+/**
+ * @class Scene
+ * @brief Manages a collection of geometric objects for ray-tracing.
+ * 
+ * The Scene class serves as a wrapper for Embree's RTCScene. It handles 
+ * the lifecycle of geometry buffers, manages spatial acceleration 
+ * structure builds (commit), and provides high-level queries like 
+ * point-in-mesh tests and intersection counting.
+ */
 class Scene {
 public:
     Scene();
@@ -35,6 +44,7 @@ public:
 
     bool isInside(const Vec3& p, const Vec3& dir = {0,0,1}) const;
     int countIntersections(const Vec3& org, const Vec3& dir, float tmax) const;
+    std::vector<float> findAllIntersections(const Vec3& org, const Vec3& dir, float tmax) const;
     
     RTCScene getInternalScene() const { return scene; }
     RTCDevice getInternalDevice() const { return device; }
@@ -44,6 +54,14 @@ private:
     RTCScene scene;
 };
 
+/**
+ * @class RayTracer
+ * @brief Static utility for fundamental ray-mesh intersection operations.
+ * 
+ * This class provides a simplified interface to Embree's intersection and 
+ * occlusion kernels. It abstracts the complexity of RTCIntersectArguments 
+ * and RTCRayHit, returning clean Hit results or boolean occlusion states.
+ */
 class RayTracer {
 public:
     static Hit intersect(const Scene& scene, const Ray& ray);

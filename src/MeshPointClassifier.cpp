@@ -1,19 +1,21 @@
-#include "InsideOutsideKernel.h"
+#include "MeshPointClassifier.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_for.h>
 #include <algorithm>
 #include <cmath>
 
-InsideOutsideKernel::InsideOutsideKernel(const Mesh& mesh) : m_mesh(mesh) {
+MeshPointClassifier::MeshPointClassifier(const Mesh& mesh) : m_mesh(mesh) {
     m_scene.addSharedMesh(m_mesh);
     m_scene.commit();
-    for (const auto& v : m_mesh.vertices) m_bbox.expand(v);
+    MeshGeometry geom(m_mesh);
+    m_bbox = geom.computeAABB();
     
     float maxDim = m_bbox.size().length();
     // Senior Engineer standard: adaptive epsilon for 32-bit float precision
     m_epsilon = std::max(1e-5f, maxDim * 1e-6f);
 }
 
-int InsideOutsideKernel::classify(const Vec3& p) const {
+int MeshPointClassifier::classify(const Vec3& p) const {
     // 1. Fast-path: strictly outside BBox
     if (p.x < m_bbox.min.x - m_epsilon || p.x > m_bbox.max.x + m_epsilon ||
         p.y < m_bbox.min.y - m_epsilon || p.y > m_bbox.max.y + m_epsilon ||
@@ -22,8 +24,6 @@ int InsideOutsideKernel::classify(const Vec3& p) const {
     }
 
     // 2. High-Reliability Surface Detection
-    // Use 7 rays (center + 6 axial displacements) to probe the immediate vicinity.
-    // If ANY ray from p - eps hit within 2*eps, we are on the surface.
     Vec3 probeDirs[3] = {{1,0,0}, {0,1,0}, {0,0,1}};
     for (int i = 0; i < 3; ++i) {
         for (float side : {-1.0f, 1.0f}) {
@@ -35,7 +35,6 @@ int InsideOutsideKernel::classify(const Vec3& p) const {
             ray.tfar = m_epsilon; 
             if (RayTracer::intersect(m_scene, ray).hit) return 0;
             
-            // Back-check: shoot through p
             ray.org = { p.x - dir.x * m_epsilon, p.y - dir.y * m_epsilon, p.z - dir.z * m_epsilon };
             ray.tfar = m_epsilon * 2.0f;
             Hit h = RayTracer::intersect(m_scene, ray);
@@ -43,9 +42,7 @@ int InsideOutsideKernel::classify(const Vec3& p) const {
         }
     }
 
-    // 3. Foolproof Parity Counting
-    // We use 3 directions based on irrational numbers (square roots) 
-    // to avoid hitting edges/vertices exactly.
+    // 3. Foolproof Parity Counting using centralized multi-hit logic
     auto checkDirection = [&](Vec3 dir) {
         float dLen = std::sqrt(dir.x*dir.x + dir.y*dir.y + dir.z*dir.z);
         dir.x /= dLen; dir.y /= dLen; dir.z /= dLen;
@@ -55,8 +52,8 @@ int InsideOutsideKernel::classify(const Vec3& p) const {
         Vec3 org = { p.x - dir.x * t_start, p.y - dir.y * t_start, p.z - dir.z * t_start };
 
         // Parity of hits before reaching p
-        int hits = m_scene.countIntersections(org, dir, t_start - m_epsilon);
-        return (hits % 2 != 0);
+        std::vector<float> hits = m_scene.findAllIntersections(org, dir, t_start - m_epsilon);
+        return (hits.size() % 2 != 0);
     };
 
     int insideVotes = 0;
@@ -68,7 +65,7 @@ int InsideOutsideKernel::classify(const Vec3& p) const {
     return (insideVotes >= 2) ? -1 : 1;
 }
 
-std::vector<int> InsideOutsideKernel::classify(const std::vector<Vec3>& points) const {
+std::vector<int> MeshPointClassifier::classify(const std::vector<Vec3>& points) const {
     std::vector<int> results(points.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, points.size()), [&](const tbb::blocked_range<size_t>& r) {
         for (size_t i = r.begin(); i != r.end(); ++i) {

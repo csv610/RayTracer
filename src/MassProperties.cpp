@@ -1,32 +1,14 @@
-#include "PhysicalProperties.h"
+#include "MassProperties.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
 #include <iostream>
 #include <algorithm>
-#include <cstring>
 #include <cmath>
 
-PhysicalProperties::PhysicalProperties(const Mesh& mesh) : mesh(mesh) {
-    device = rtcNewDevice(nullptr);
-    scene = rtcNewScene(device);
-    buildScene();
-}
-
-PhysicalProperties::~PhysicalProperties() {
-    rtcReleaseScene(scene);
-    rtcReleaseDevice(device);
-}
-
-void PhysicalProperties::buildScene() {
-    RTCGeometry geom = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
-    Vertex* vb = (Vertex*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, sizeof(Vertex), mesh.vertices.size());
-    memcpy(vb, mesh.vertices.data(), mesh.vertices.size() * sizeof(Vertex));
-    Triangle* ib = (Triangle*)rtcSetNewGeometryBuffer(geom, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(Triangle), mesh.triangles.size());
-    memcpy(ib, mesh.triangles.data(), mesh.triangles.size() * sizeof(Triangle));
-    rtcCommitGeometry(geom);
-    rtcAttachGeometry(scene, geom);
-    rtcReleaseGeometry(geom);
-    rtcCommitScene(scene);
+MassProperties::MassProperties(const Mesh& mesh) : m_mesh(mesh) {
+    m_scene.addSharedMesh(m_mesh);
+    m_scene.commit();
 }
 
 struct AccumMass {
@@ -34,11 +16,11 @@ struct AccumMass {
     AccumMass() = default;
 };
 
-PhysicalProperties::Properties PhysicalProperties::compute(int res) const {
-    AABB bbox;
-    for (const auto& v : mesh.vertices) bbox.expand(v);
+MassProperties::Properties MassProperties::compute(int res) const {
+    MeshGeometry geom(m_mesh);
+    AABB bbox = geom.computeAABB();
     Vec3 size = bbox.size();
-    float diag = sqrt(size.x*size.x + size.y*size.y + size.z*size.z);
+    float diag = size.length();
 
     double dx = size.x / res, dy = size.y / res;
     double areaStep = dx * dy;
@@ -48,25 +30,17 @@ PhysicalProperties::Properties PhysicalProperties::compute(int res) const {
             for (int j = 0; j < res; ++j) {
                 double x = bbox.min.x + (i + 0.5) * dx;
                 double y = bbox.min.y + (j + 0.5) * dy;
-                RTCRayHit rh;
-                rh.ray.org_x = (float)x; rh.ray.org_y = (float)y; rh.ray.org_z = bbox.min.z - diag * 0.1f;
-                rh.ray.dir_x = 0; rh.ray.dir_y = 0; rh.ray.dir_z = 1.0f;
-                rh.ray.tnear = 0; rh.ray.tfar = diag * 1.2f; rh.ray.mask = -1;
-                rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-                RTCIntersectArguments args; rtcInitIntersectArguments(&args);
-                std::vector<float> hits;
-                while(true) {
-                    rtcIntersect1(scene, &rh, &args);
-                    if (rh.hit.geomID == RTC_INVALID_GEOMETRY_ID) break;
-                    hits.push_back(rh.ray.tfar);
-                    rh.ray.tnear = rh.ray.tfar + 1e-6f;
-                    rh.ray.tfar = diag * 1.2f;
-                    rh.hit.geomID = RTC_INVALID_GEOMETRY_ID;
-                }
+                
+                Vec3 org = {(float)x, (float)y, bbox.min.z - diag * 0.1f};
+                Vec3 dir = {0, 0, 1.0f};
+                
+                // Centralized logic to find all intersection distances
+                std::vector<float> hits = m_scene.findAllIntersections(org, dir, diag * 1.2f);
+                
                 if (hits.size() >= 2) {
                     std::sort(hits.begin(), hits.end());
                     for (size_t k = 0; k + 1 < hits.size(); k += 2) {
-                        double zS = rh.ray.org_z + hits[k], zE = rh.ray.org_z + hits[k+1], L = zE - zS;
+                        double zS = org.z + hits[k], zE = org.z + hits[k+1], L = zE - zS;
                         double dV = L * areaStep;
                         a.v += dV; a.cx += x * dV; a.cy += y * dV; a.cz += (zS+zE)*0.5 * dV;
                         a.ixx += (y*y*L + (zE*zE*zE - zS*zS*zS)/3.0)*areaStep;

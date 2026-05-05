@@ -1,4 +1,5 @@
 #include "AssemblyAnalyzer.h"
+#include "MeshGeometry.h"
 #include <tbb/parallel_for.h>
 #include <iostream>
 #include <cstring>
@@ -24,8 +25,8 @@ AssemblyAnalyzer::Result AssemblyAnalyzer::analyzeClearance(float threshold) con
     Result res;
     res.colors.resize(part.triangles.size());
     tbb::parallel_for(size_t(0), part.triangles.size(), [&](size_t i) {
-        Vec3 center = computeFaceCenter(part.vertices[part.triangles[i].v0], part.vertices[part.triangles[i].v1], part.vertices[part.triangles[i].v2]);
-        Vec3 normal = computeFaceNormal(part.vertices[part.triangles[i].v0], part.vertices[part.triangles[i].v1], part.vertices[part.triangles[i].v2]);
+        Vec3 center = MeshGeometry::computeFaceCenter(part.nodes[part.triangles[i].v0], part.nodes[part.triangles[i].v1], part.nodes[part.triangles[i].v2]);
+        Vec3 normal = MeshGeometry::computeFaceNormal(part.nodes[part.triangles[i].v0], part.nodes[part.triangles[i].v1], part.nodes[part.triangles[i].v2]);
         
         if (envScene.isInside(center)) { res.colors[i] = {255, 0, 0, 255}; return; }
         
@@ -46,7 +47,7 @@ AssemblyAnalyzer::Result AssemblyAnalyzer::verifyExtractionPath(Vec3 moveDir, fl
     Result res;
     res.colors.resize(part.triangles.size());
     tbb::parallel_for(size_t(0), part.triangles.size(), [&](size_t i) {
-        Vec3 center = computeFaceCenter(part.vertices[part.triangles[i].v0], part.vertices[part.triangles[i].v1], part.vertices[part.triangles[i].v2]);
+        Vec3 center = MeshGeometry::computeFaceCenter(part.nodes[part.triangles[i].v0], part.nodes[part.triangles[i].v1], part.nodes[part.triangles[i].v2]);
         Ray ray;
         ray.org = center;
         ray.dir = moveDir;
@@ -63,7 +64,7 @@ AssemblyAnalyzer::Result AssemblyAnalyzer::verifyExtractionPath(Vec3 moveDir, fl
 std::vector<Color4b> AssemblyAnalyzer::analyzeVisibility(Vec3 viewerPos) const {
     std::vector<Color4b> colors(part.triangles.size());
     tbb::parallel_for(size_t(0), part.triangles.size(), [&](size_t i) {
-        Vec3 center = computeFaceCenter(part.vertices[part.triangles[i].v0], part.vertices[part.triangles[i].v1], part.vertices[part.triangles[i].v2]);
+        Vec3 center = MeshGeometry::computeFaceCenter(part.nodes[part.triangles[i].v0], part.nodes[part.triangles[i].v1], part.nodes[part.triangles[i].v2]);
         Vec3 dir = {center.x - viewerPos.x, center.y - viewerPos.y, center.z - viewerPos.z};
         float dist = dir.length();
         if(dist > 0) { dir.x/=dist; dir.y/=dist; dir.z/=dist; }
